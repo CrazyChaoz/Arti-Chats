@@ -1,0 +1,34 @@
+use crate::MessagingClient;
+use log::debug;
+use jni_sys::*;
+
+pub trait OnEvent {
+    fn new_message(&self, s: &str);
+}
+
+foreign_callback!(callback MessageObserver {
+    self_type OnEvent;
+    onStateChanged = OnEvent::new_message(&self, s: &str);
+});
+
+foreign_class!(class MessagingClient {
+    self_type MessagingClient;
+    constructor MessagingClient::from_custom_cache(cache: &str) -> MessagingClient;
+    constructor MessagingClient::default() -> MessagingClient;
+   fn MessagingClient::add_onion_v3_from_esk(
+        &mut self,
+        expanded_secret_key: &[i16],
+    ) -> String;
+    fn MessagingClient::add_onion_v3_from_sk(
+        &mut self,
+        secret_key: &[i16],
+    ) -> String;
+    fn MessagingClient::get_onion_address(public_key: &[i16]) -> String;
+    fn MessagingClient::generate_key() -> Vec<i16>;
+    fn MessagingClient::send_message(
+        &mut self,
+        message: String,
+        onion_address: String,
+    ) -> String;
+    fn MessagingClient::subscribe(&mut self, _: Box<dyn OnEvent>);
+});

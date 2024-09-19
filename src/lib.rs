@@ -1,46 +1,45 @@
-extern crate jni;
-
-use jni::objects::{GlobalRef, JClass, JObject, JString};
-use jni::sys::{jstring};
-use jni::JNIEnv;
-use std::sync::{Mutex};
 use anyhow::Result;
 use arti_client::config::TorClientConfigBuilder;
 use arti_client::{TorClient, TorClientConfig};
 use base64::Engine;
+use fs_mistrust::Mistrust;
+use futures_util::StreamExt;
+use http_body_util::BodyExt;
+use hyper::server::conn::http1;
+use hyper::service::service_fn;
+use hyper::{Request, Response, StatusCode, Uri};
+use hyper_util::rt::TokioIo;
 use rand::RngCore;
 use sha3::{Digest, Sha3_256};
 use std::io::Error;
-use std::net::ToSocketAddrs;
-use std::sync::{Arc};
-use fs_mistrust::Mistrust;
-use tor_keymgr::{ArtiEphemeralKeystore, KeyMgrBuilder, KeystoreSelector};
-use tor_rtcompat::PreferredRuntime;
+use std::str::FromStr;
+use std::sync::{Arc, Mutex};
+use tor_cell::relaycell::msg::Connected;
 use tor_hsservice::config::OnionServiceConfigBuilder;
 use tor_hsservice::{HsIdKeypairSpecifier, OnionService};
-use tor_llcrypto::pk::ed25519::ExpandedKeypair;
-use http_body_util::{BodyExt};
-use hyper::body::{Incoming};
-use hyper::{Request, Response, StatusCode, Uri};
-use hyper_util::rt::TokioIo;
-use lazy_static::lazy_static;
 use tor_keymgr::key_specifier_derive::RawKeySpecifierComponentParser;
-use tor_proto::stream::DataStream;
+use tor_keymgr::{ArtiEphemeralKeystore, KeyMgrBuilder, KeystoreSelector};
+use tor_llcrypto::pk::ed25519::ExpandedKeypair;
+use tor_proto::stream::{DataStream, IncomingStreamRequest};
+use tor_rtcompat::PreferredRuntime;
+mod java_glue;
+pub use crate::java_glue::*;
 
 pub struct MessagingClient {
-    pub client: TorClient<PreferredRuntime>,
+    client: TorClient<PreferredRuntime>,
     keystore: Arc<tor_keymgr::KeyMgr>,
+    observers: Arc<Mutex<Vec<Box<dyn java_glue::OnEvent>>>>,
 }
 
 impl MessagingClient {
-    pub async fn default() -> Result<MessagingClient, Error> {
+    pub fn default() -> MessagingClient {
         let config = TorClientConfig::default();
 
-        Self::new(config).await
+        Self::new(config).expect("error creating MessagingClient")
     }
 
 
-    pub async fn from_custom_cache(cache: &str) -> Result<MessagingClient, Error> {
+    pub fn from_custom_cache(cache: &str) -> MessagingClient {
         let config = TorClientConfigBuilder::from_directories(
             format!("{cache}{}arti-data", std::path::MAIN_SEPARATOR),
             format!("{cache}{}arti-cache", std::path::MAIN_SEPARATOR),
@@ -48,50 +47,64 @@ impl MessagingClient {
             .build()
             .expect("error building Tor client config");
 
-        Self::new(config).await
+        Self::new(config).expect("error creating MessagingClient")
     }
 
 
-    pub async fn new(config: TorClientConfig) -> Result<MessagingClient, Error> {
-        let client = TorClient::create_bootstrapped(config)
-            .await
-            .expect("error bootstrapping tor client");
-        let keystore_mgr = Arc::new(
-            KeyMgrBuilder::default()
-                .default_store(Box::new(ArtiEphemeralKeystore::new(
-                    "in-memory-data-store".to_string(),
-                )))
-                .build()
-                .expect("error building key manager"),
-        );
+    pub fn new(config: TorClientConfig) -> Result<MessagingClient, Error> {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
 
-        Ok(MessagingClient {
-            client,
-            keystore: keystore_mgr,
+        rt.block_on(async {
+            let client = TorClient::create_bootstrapped(config).await.unwrap();
+            let keystore_mgr = Arc::new(
+                KeyMgrBuilder::default()
+                    .default_store(Box::new(ArtiEphemeralKeystore::new(
+                        "in-memory-data-store".to_string(),
+                    )))
+                    .build()
+                    .expect("error building key manager"),
+            );
+
+            Ok(MessagingClient {
+                client,
+                keystore: keystore_mgr,
+                observers: Arc::new(Mutex::new(Vec::new())),
+            })
         })
     }
-    pub async fn add_onion_v3_from_esk<
-        S: ToSocketAddrs,
-        I: IntoIterator<Item=(u16, S)> + Send + 'static,
-    >(
+    pub fn add_onion_v3_from_sk(
         &mut self,
-        expanded_secret_key: &[u8; 64]
-    ) -> Result<String, Error>
-    where
-        <I as IntoIterator>::IntoIter: Send,
-    {
-        let esk = ExpandedKeypair::from_secret_key_bytes(*expanded_secret_key)
+        secret_key: &[i16],
+    ) -> String {
+        let positive_secret_key = secret_key.iter().map(|x| x.abs() as u8).collect::<Vec<u8>>();
+        let sk = <[u8; 32]>::try_from(positive_secret_key).expect("could not convert to [u8; 32]");
+        let sk = sk as ed25519_dalek::SecretKey;
+        let esk = ed25519_dalek::hazmat::ExpandedSecretKey::from(&sk);
+        let esk = [esk.scalar.to_bytes(), esk.hash_prefix].concat();
+        let esk:Vec<i16> = esk.into_iter().map(|x| x as i16).collect();
+        self.add_onion_v3_from_esk(esk.as_slice())
+    }
+
+    pub fn add_onion_v3_from_esk(
+        &mut self,
+        expanded_secret_key: &[i16],
+    ) -> String {
+        let positive_secret_key = expanded_secret_key.iter().map(|x| x.abs() as u8).collect::<Vec<u8>>();
+        let expanded_secret = <[u8; 64]>::try_from(positive_secret_key).expect("could not convert to [u8; 64]");
+        let esk = ExpandedKeypair::from_secret_key_bytes(expanded_secret)
             .expect("error converting to ExpandedKeypair");
         let pk = esk.public();
 
-        let onion_address = get_onion_address(&pk.to_bytes());
+        let onion_address = MessagingClient::get_onion_address(&pk.to_bytes().map(|x| x as i16));
         let clone_onion_address = onion_address.clone();
-
         let nickname = format!(
             "tor-chat-{}",
             onion_address.clone().chars().take(16).collect::<String>()
         );
-
+        // let handler = Arc::new(WebHandler { messaging_client: Arc::new(self) });
         let encodable_key = tor_hscrypto::pk::HsIdKeypair::from(esk);
 
         self.keystore
@@ -131,24 +144,57 @@ impl MessagingClient {
             )
             .unwrap();
 
+
         eprintln!("onion service created: {}", service.onion_name().unwrap());
 
+        let stream_requests = tor_hsservice::handle_rend_requests(request_stream);
 
-        Ok(clone_onion_address)
+        let observers=self.observers.clone();
+
+        tokio::spawn(async move {
+            tokio::pin!(stream_requests);
+            while let Some(stream_request) = stream_requests.next().await {
+                let request = stream_request.request().clone();
+                let _ = match request {
+                    IncomingStreamRequest::Begin(begin) if begin.port() == 80 => {
+                        let onion_service_stream = stream_request.accept(Connected::new_empty()).await.unwrap();
+                        let io = TokioIo::new(onion_service_stream);
+
+                        let _ = http1::Builder::new()
+                            .serve_connection(io, service_fn(|request| async {
+                                let path = request.uri().path();
+                                if path == "/message" {
+                                    let message = request.collect().await.unwrap().to_bytes();
+                                    let message = String::from_utf8(message.to_vec()).expect("error parsing message");
+                                    for cb in observers.lock().unwrap().iter() {
+                                        cb.new_message(&message);
+                                    }
+                                }
+                                Ok(Response::builder().status(StatusCode::OK).body("Message received".to_string())?)
+                            }));
+                    }
+                    _ => {
+                        stream_request.shutdown_circuit().unwrap();
+                    }
+                };
+            }
+            drop(service);
+        });
+
+        clone_onion_address
     }
 
-
-    pub async fn send_message(&self, message:  &str, recipient:  &'static str) -> Result<String> {
-        let url: Uri = Uri::from_static(recipient);
+    pub async fn send_message_inner(&self, message: &str, recipient: &str) -> String {
+        let url: Uri = Uri::from_str(recipient).expect("error parsing recipient URL");
         let host = url.host().unwrap();
 
-        let stream:DataStream = self.client
+        let stream: DataStream = self.client
             .connect((host, 80))
             .await
             .expect("connect failed");
 
         let (mut request_sender, connection) =
-            hyper::client::conn::http1::handshake(TokioIo::new(stream)).await?;
+            hyper::client::conn::http1::handshake(TokioIo::new(stream)).await.unwrap();
 
         // spawn a task to poll the connection and drive the HTTP state
         tokio::spawn(async move {
@@ -161,122 +207,66 @@ impl MessagingClient {
                     .uri("/")
                     .header("Host", host)
                     .method("GET")
-                    .body(message.to_string())?,
+                    .body(message.to_string()).unwrap(),
             )
-            .await?;
+            .await.unwrap();
 
         match resp.status().as_u16() {
             200 => {
                 if let Some(frame) = resp.body_mut().frame().await {
-                    let bytes = frame?.into_data().unwrap();
-                    return Ok(std::str::from_utf8(&bytes)?.to_string());
+                    let bytes = frame.unwrap().into_data().unwrap();
+                    return std::str::from_utf8(&bytes).unwrap().to_string();
                 }
-                Err(anyhow::anyhow!("status 200 but no body"))
+                "status 200 but no body".to_string()
             }
             _ => {
-                Err(anyhow::anyhow!("error: status {}",resp.status()))
+                "error: status {}".to_string()
             }
         }
     }
-}
 
-pub fn generate_key() -> [u8; 32] {
-    let mut rng = rand::thread_rng();
-    let mut sk = [0u8; 32];
-    rng.fill_bytes(&mut sk);
-    sk
-}
+    pub fn send_message(&self, message: String, recipient: String) -> String {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
 
-pub fn get_onion_address(public_key: &[u8; 32]) -> String {
-    let mut buf = [0u8; 35];
-    public_key.iter().copied().enumerate().for_each(|(i, b)| {
-        buf[i] = b;
-    });
-
-    let mut h = Sha3_256::new();
-    h.update(b".onion checksum");
-    h.update(public_key);
-    h.update(b"\x03");
-
-    let res_vec = h.finalize().to_vec();
-    buf[32] = res_vec[0];
-    buf[33] = res_vec[1];
-    buf[34] = 3;
-
-    base32::encode(base32::Alphabet::Rfc4648 { padding: false }, &buf).to_ascii_lowercase()
-}
-
-
-struct WebHandler {}
-
-impl WebHandler {
-    async fn serve(&self, request: Request<Incoming>) -> Result<Response<String>> {
-        let path = request.uri().path();
-        if path == "/message" {
-            let message = request.body();
-        }
-        Ok(Response::builder().status(StatusCode::OK).body("Message received".to_string())?)
+        rt.block_on(async {
+            self.send_message_inner(&*message, &*recipient).await
+        })
     }
-}
-
-// Global reference to the Java callback
-struct Callback {
-    java_callback: GlobalRef,
-}
-
-lazy_static! {
-    static ref CALLBACK: Arc<Mutex<Option<Callback>>> = Arc::new(Mutex::new(None));
-}
-
-// Register the Java callback
-#[no_mangle]
-pub extern "system" fn Java_Messenger_registerCallback(
-    env: JNIEnv,
-    _class: JClass,
-    callback: JObject,
-) {
-    let callback_ref = env.new_global_ref(callback).expect("Couldn't create global ref");
-
-    let mut cb = CALLBACK.lock().unwrap();
-    *cb = Some(Callback {
-        java_callback: callback_ref,
-    });
-
-    println!("Callback registered");
-}
-
-fn string_to_jstring(env: *mut JNIEnv, rust_str: String) -> JString {
-    // let x = ::std::ffi::CString::new(rust_str).unwrap();
-    unsafe { env.as_ref().expect("error converting to reference").new_string(rust_str).expect("issue converting string_to_jstring") }
-}
-fn jstring_to_string(env: *mut JNIEnv, js: jstring) -> String {
-    if !js.is_null() {
-        unsafe { env.as_ref().expect("error converting to reference").get_string_unchecked(&JString::from_raw(js)).expect("issue converting jstring_to_string").to_str().expect("").to_string()}
-    } else {
-        "".to_string()
+    pub fn generate_key() -> Vec<i16> {
+        let mut rng = rand::thread_rng();
+        let mut sk = [0u8; 32];
+        rng.fill_bytes(&mut sk);
+        let sk:Vec<i16>= sk.map(|x| x as i16).to_vec();
+        sk
     }
-}
 
-pub fn calculation_done(env: &mut JNIEnv) {
-    let cb = CALLBACK.lock().unwrap();
 
-    if let Some(ref callback) = *cb {
+    pub fn get_onion_address(public_key: &[i16]) -> String {
+        let positive_key = public_key.iter().map(|x| x.abs() as u8).collect::<Vec<u8>>();
+        let pub_key = <[u8; 32]>::try_from(positive_key).expect("could not convert to [u8; 32]");
+        let mut buf = [0u8; 35];
+        pub_key.iter().copied().enumerate().for_each(|(i, b)| {
+            buf[i] = b;
+        });
 
-        let result = (&string_to_jstring(env,"result".to_string()));
+        let mut h = Sha3_256::new();
+        h.update(b".onion checksum");
+        h.update(pub_key);
+        h.update(b"\x03");
 
-        // Call Java method onCalculationReady with result
-        env.call_method(
-            callback.java_callback.as_obj(),
-            "onCalculationReady",
-            "(I)V",
-            &[result.into()],
-        )
-            .expect("Failed to call Java method");
+        let res_vec = h.finalize().to_vec();
+        buf[32] = res_vec[0];
+        buf[33] = res_vec[1];
+        buf[34] = 3;
+
+        base32::encode(base32::Alphabet::Rfc4648 { padding: false }, &buf).to_ascii_lowercase()
     }
-}
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {}
+    fn subscribe(&mut self, cb: Box<dyn java_glue::OnEvent>) {
+        let mut obs = self.observers.lock().unwrap();
+        obs.push(cb);
+    }
 }

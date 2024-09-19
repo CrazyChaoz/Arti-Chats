@@ -23,10 +23,41 @@ base64 = "0.22.1"
 rand = "0.8"
 sha3 = "0.10"
 fs-mistrust = "0.7"
-hyper = { version = "1.4", features = ["http1", "client"] }
+hyper = { version = "1.4", features = ["http1", "server", "client"] }
 tokio = "1.40"
 http-body-util = "0.1"
 hyper-util = { version = "0.1", features = ["tokio"] }
 base32 = "0.5"
-lazy_static = "1.5.0"
+ed25519-dalek = "2.1"
+once_cell = "1.19.0"
+futures-util = "0.3.30"
+env_logger = "0.11.5"
+log = "0.4"
 jni = "0.21"
+jni-sys = "0.3"
+
+
+
+# dependancies specific to iOS
+[target.'cfg(target_os = "ios")'.dependencies]
+#tracing-oslog = "0.1.2"
+
+
+# dependancies specific to Android
+[target.'cfg(target_os = "android")'.dependencies]
+
+# dependancy to help implementing lockf, for android < 7.0
+#libc = "0.2.112"
+
+
+[lib]
+# dylib is for Android, staticlib is for iOS
+crate-type = ["dylib", "staticlib"]
+
+[build-dependencies]
+env_logger = "0.11.5"
+flapigen = "0.7"
+log = "0.4"
+jni = "0.21"
+jni-sys = "0.3"
+bindgen = "0.52"
