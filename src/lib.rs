@@ -100,16 +100,12 @@ impl MessagingClient {
         &mut self,
         secret_key: &[i16],
     ) -> String {
-        eprintln!("Adding onion service");
         let positive_secret_key = secret_key.iter().map(|x| x.abs() as u8).collect::<Vec<u8>>();
-        eprintln!("positive_secret key: {:?}", positive_secret_key);
         let sk = <[u8; 32]>::try_from(positive_secret_key).expect("could not convert to [u8; 32]");
-        eprintln!("sk: {:?}", sk);
         let sk = sk as ed25519_dalek::SecretKey;
         let esk = ed25519_dalek::hazmat::ExpandedSecretKey::from(&sk);
         let esk = [esk.scalar.to_bytes(), esk.hash_prefix].concat();
         let esk: Vec<i16> = esk.into_iter().map(|x| x as i16).collect();
-        eprintln!("esk: {:?}", esk);
         self.add_onion_v3_from_esk(esk.as_slice())
     }
 
@@ -171,25 +167,24 @@ impl MessagingClient {
 
 
         info!("onion service created: {}", service.onion_name().unwrap());
+        eprintln!("onion service created: {}", service.onion_name().unwrap());
 
         #[cfg(target_os = "android")]
         let observer_clone = self.observers.clone();
 
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .unwrap();
+        let rt = if let Ok(runtime) = PreferredRuntime::current() { runtime } else { PreferredRuntime::create().expect("could not create async runtime") };
 
         rt.spawn(async move {
             info!("entering loop");
+            eprintln!("entering loop");
 
-            let stream_requests = tor_hsservice::handle_rend_requests(request_stream);
+            let mut stream_requests = tor_hsservice::handle_rend_requests(request_stream);
 
             #[cfg(target_os = "android")]
             info!( "onion service created: {}", service.onion_name().unwrap());
 
-            tokio::pin!(stream_requests);
-            while let Some(stream_request) = stream_requests.next().await {
+            let mut pinned = Box::pin(stream_requests);
+            while let Some(stream_request) = pinned.next().await {
                 let request = stream_request.request().clone();
                 let _ = match request {
                     IncomingStreamRequest::Begin(begin) if begin.port() == 80 => {
@@ -219,7 +214,7 @@ impl MessagingClient {
             }
             drop(service);
             info!("onion service dropped");
-        });
+        }).expect("error while spawning new thread");
 
         clone_onion_address
     }
