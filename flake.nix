@@ -82,7 +82,7 @@
 
                 copyLibs = true;
                 CARGO_BUILD_TARGET = target;
-                "RUST_BACKTRACE" = "1";
+                "RUST_BACKTRACE" = "full";
                 "CC_${target}" =
                 "${ndk-bundle}/libexec/android-sdk/ndk-bundle/toolchains/llvm/prebuilt/${hostArchLlvm}/bin/${ clangTarget target }${androidMinSdkApiLevel}-clang";
                 "CARGO_TARGET_${ changeCaseSnakeUpper target }_LINKER" =

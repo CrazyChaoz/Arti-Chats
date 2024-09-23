@@ -8,11 +8,11 @@ arti-client = { version="0.22.0", features=["onion-service-service","onion-servi
 tor-cell = "0.22"
 tor-hsservice = "0.22"
 tor-proto = "0.22"
-tor-rtcompat = "0.22"
+tor-rtcompat = { version = "0.22", features = ["static"] }
 tor-hsrproxy = "0.22"
 tor-keymgr = "0.22"
 tor-llcrypto = "0.22"
-tor-dirmgr = "0.22"
+tor-dirmgr = { version = "0.22", features = ["static"] }
 tor-netdir = "0.22"
 tor-hscrypto = "0.22"
 tor-persist = "0.22"
