@@ -69,9 +69,16 @@
                 cargoTestOptions = lst: lst ++ [ "--package ${cargoPackage}" ];
                 #singleStep = true; # to catch non-determinism in dependencies
                 overrideMain = _: {
+                preBuild = ''
+                    mkdir -p app/src/main/java/at/jku/ins/chat
+                    '';
+                 postBuild = ''
+                  mkdir -p $out/app/src/main/java/at/jku/ins/chat
+                    cp -r app/src/main/java/at/jku/ins/chat/* $out/app/src/main/java/at/jku/ins/chat
+                    '';
                 };
                 nativeBuildInputs = with pkgs; [ ndk-bundle perl pkg-config ];
-                buildInputs = with pkgs; [ openssl ];
+                #buildInputs = with pkgs; [ openssl ];
 
                 copyLibs = true;
                 CARGO_BUILD_TARGET = target;
@@ -87,7 +94,7 @@
 
     in {
         packages.${system}.default = pkgs.linkFarm "android-all-archs" (
-            attributeUtils.mapAttrsToList (target_name: t_pkgs: { name = targetInfo.${target_name}.gradle; path = "${t_pkgs.embedded}/lib"; }
+            attributeUtils.mapAttrsToList (target_name: t_pkgs: { name = targetInfo.${target_name}.gradle; path = "${t_pkgs.embedded}"; }
             ) embeddedAllAndroid);
 
         devShells.${system}.default =
