@@ -3,19 +3,19 @@ use arti_client::config::TorClientConfigBuilder;
 use arti_client::{TorClient, TorClientConfig};
 use base64::Engine;
 use fs_mistrust::Mistrust;
+use futures_util::task::SpawnExt;
 use futures_util::StreamExt;
 use http_body_util::BodyExt;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Request, Response, StatusCode, Uri};
 use hyper_util::rt::TokioIo;
+use log::info;
 use rand::RngCore;
 use sha3::{Digest, Sha3_256};
 use std::io::Error;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
-use futures_util::task::SpawnExt;
-use log::info;
 use tor_cell::relaycell::msg::Connected;
 use tor_hsservice::config::OnionServiceConfigBuilder;
 use tor_hsservice::{HsIdKeypairSpecifier, OnionService};
@@ -57,12 +57,11 @@ impl MessagingClient {
             .build()
             .expect("error building Tor client config");
 
-        Self::new(config,cache).expect("error creating MessagingClient")
+        Self::new(config, cache).expect("error creating MessagingClient")
     }
 
 
-    pub fn new(config: TorClientConfig, cache_dir:&str) -> Result<MessagingClient, Error> {
-
+    pub fn new(config: TorClientConfig, cache_dir: &str) -> Result<MessagingClient, Error> {
         #[cfg(target_os = "android")]
         Subscriber::new()
             .with(tracing_android::layer("rust.arti")?)
@@ -109,7 +108,7 @@ impl MessagingClient {
         let sk = sk as ed25519_dalek::SecretKey;
         let esk = ed25519_dalek::hazmat::ExpandedSecretKey::from(&sk);
         let esk = [esk.scalar.to_bytes(), esk.hash_prefix].concat();
-        let esk:Vec<i16> = esk.into_iter().map(|x| x as i16).collect();
+        let esk: Vec<i16> = esk.into_iter().map(|x| x as i16).collect();
         eprintln!("esk: {:?}", esk);
         self.add_onion_v3_from_esk(esk.as_slice())
     }
@@ -171,49 +170,56 @@ impl MessagingClient {
             .unwrap();
 
 
-        info!( "onion service created: {}", service.onion_name().unwrap());
-        // eprintln!("onion service created: {}", service.onion_name().unwrap());
-
-        let stream_requests = tor_hsservice::handle_rend_requests(request_stream);
+        info!("onion service created: {}", service.onion_name().unwrap());
 
         #[cfg(target_os = "android")]
-        let observer_clone=self.observers.clone();
+        let observer_clone = self.observers.clone();
 
-        clone_client.runtime().clone().spawn(async move {
-            tokio::spawn(async move {
-                tokio::pin!(stream_requests);
-                while let Some(stream_request) = stream_requests.next().await {
-                    let request = stream_request.request().clone();
-                    let _ = match request {
-                        IncomingStreamRequest::Begin(begin) if begin.port() == 80 => {
-                            let onion_service_stream = stream_request.accept(Connected::new_empty()).await.unwrap();
-                            let io = TokioIo::new(onion_service_stream);
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
 
-                            let _ = http1::Builder::new()
-                                .serve_connection(io, service_fn(|request| async {
-                                    info!("request gotten");
-                                    let path = request.uri().path();
-                                    if path == "/message" {
-                                        let message = request.collect().await.unwrap().to_bytes();
-                                        let message = String::from_utf8(message.to_vec()).expect("error parsing message");
+        rt.spawn(async move {
+            info!("entering loop");
 
-                                        #[cfg(target_os = "android")]
-                                        for cb in observer_clone.lock().unwrap().iter() {
-                                            cb.new_message(&message);
-                                        }
+            let stream_requests = tor_hsservice::handle_rend_requests(request_stream);
+
+            #[cfg(target_os = "android")]
+            info!( "onion service created: {}", service.onion_name().unwrap());
+
+            tokio::pin!(stream_requests);
+            while let Some(stream_request) = stream_requests.next().await {
+                let request = stream_request.request().clone();
+                let _ = match request {
+                    IncomingStreamRequest::Begin(begin) if begin.port() == 80 => {
+                        let onion_service_stream = stream_request.accept(Connected::new_empty()).await.unwrap();
+                        let io = TokioIo::new(onion_service_stream);
+
+                        let _ = http1::Builder::new()
+                            .serve_connection(io, service_fn(|request| async {
+                                info!("request gotten");
+                                let path = request.uri().path();
+                                if path == "/message" {
+                                    let message = request.collect().await.unwrap().to_bytes();
+                                    let message = String::from_utf8(message.to_vec()).expect("error parsing message");
+
+                                    #[cfg(target_os = "android")]
+                                    for cb in observer_clone.lock().unwrap().iter() {
+                                        cb.new_message(&message);
                                     }
-                                    Ok::<Response<String>, anyhow::Error>(Response::builder().status(StatusCode::OK).body("Message received".to_string())?)
-                                }));
-                        }
-                        _ => {
-                            stream_request.shutdown_circuit().unwrap();
-                        }
-                    };
-                }
-                drop(service);
-                info!("onion service dropped");
-            });
-        }).expect("error happend during spawning");
+                                }
+                                Ok::<Response<String>, anyhow::Error>(Response::builder().status(StatusCode::OK).body("Message received".to_string())?)
+                            }));
+                    }
+                    _ => {
+                        stream_request.shutdown_circuit().unwrap();
+                    }
+                };
+            }
+            drop(service);
+            info!("onion service dropped");
+        });
 
         clone_onion_address
     }
@@ -273,7 +279,7 @@ impl MessagingClient {
         let mut rng = rand::thread_rng();
         let mut sk = [0u8; 32];
         rng.fill_bytes(&mut sk);
-        let sk:Vec<i16>= sk.map(|x| x as i16).to_vec();
+        let sk: Vec<i16> = sk.map(|x| x as i16).to_vec();
         sk
     }
 
