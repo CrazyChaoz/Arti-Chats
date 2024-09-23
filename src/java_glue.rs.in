@@ -1,8 +1,7 @@
 use crate::MessagingClient;
-use log::debug;
 use jni_sys::*;
 
-pub trait OnEvent {
+pub trait OnEvent : Send {
     fn new_message(&self, s: &str);
 }
 

@@ -149,7 +149,7 @@ impl MessagingClient {
 
         let stream_requests = tor_hsservice::handle_rend_requests(request_stream);
 
-        let observers=self.observers.clone();
+        let observer_clone=self.observers.clone();
 
         tokio::spawn(async move {
             tokio::pin!(stream_requests);
@@ -166,11 +166,11 @@ impl MessagingClient {
                                 if path == "/message" {
                                     let message = request.collect().await.unwrap().to_bytes();
                                     let message = String::from_utf8(message.to_vec()).expect("error parsing message");
-                                    for cb in observers.lock().unwrap().iter() {
+                                    for cb in observer_clone.lock().unwrap().iter() {
                                         cb.new_message(&message);
                                     }
                                 }
-                                Ok(Response::builder().status(StatusCode::OK).body("Message received".to_string())?)
+                                Ok::<Response<String>, anyhow::Error>(Response::builder().status(StatusCode::OK).body("Message received".to_string())?)
                             }));
                     }
                     _ => {
