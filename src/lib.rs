@@ -22,6 +22,10 @@ use tor_keymgr::{ArtiEphemeralKeystore, KeyMgrBuilder, KeystoreSelector};
 use tor_llcrypto::pk::ed25519::ExpandedKeypair;
 use tor_proto::stream::{DataStream, IncomingStreamRequest};
 use tor_rtcompat::PreferredRuntime;
+use tracing_subscriber::fmt::Subscriber;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+
 mod java_glue;
 pub use crate::java_glue::*;
 
@@ -52,6 +56,13 @@ impl MessagingClient {
 
 
     pub fn new(config: TorClientConfig) -> Result<MessagingClient, Error> {
+
+        Subscriber::new()
+            .with(tracing_android::layer("rust.arti")?)
+            .init(); // this must be called only once, otherwise your app will probably crash
+
+        eprintln!("Starting Tor client");
+
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -67,6 +78,8 @@ impl MessagingClient {
                     .build()
                     .expect("error building key manager"),
             );
+
+            eprintln!("Tor client started");
 
             Ok(MessagingClient {
                 client,

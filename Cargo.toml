@@ -35,6 +35,7 @@ env_logger = "0.11.5"
 log = "0.4"
 jni = "0.21"
 jni-sys = "0.3"
+tracing-android = "0.2"
 
 
 
@@ -52,7 +53,7 @@ jni-sys = "0.3"
 
 [lib]
 # dylib is for Android, staticlib is for iOS
-crate-type = ["dylib", "staticlib"]
+crate-type = ["cdylib"]
 
 [build-dependencies]
 env_logger = "0.11.5"

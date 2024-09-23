@@ -94,7 +94,7 @@
 
     in {
         packages.${system}.default = pkgs.linkFarm "android-all-archs" (
-            attributeUtils.mapAttrsToList (target_name: t_pkgs: { name = targetInfo.${target_name}.gradle; path = "${t_pkgs.embedded}"; }
+            attributeUtils.mapAttrsToList (target_name: t_pkgs: { name = targetInfo.${target_name}.gradle; path = "${t_pkgs.embedded}/lib"; }
             ) embeddedAllAndroid);
 
         devShells.${system}.default =
