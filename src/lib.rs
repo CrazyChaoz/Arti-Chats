@@ -15,6 +15,7 @@ use std::io::Error;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use futures_util::task::SpawnExt;
+use log::info;
 use tor_cell::relaycell::msg::Connected;
 use tor_hsservice::config::OnionServiceConfigBuilder;
 use tor_hsservice::{HsIdKeypairSpecifier, OnionService};
@@ -170,7 +171,7 @@ impl MessagingClient {
             .unwrap();
 
 
-        log::log!(log::Level::Info, "onion service created: {}", service.onion_name().unwrap());
+        info!( "onion service created: {}", service.onion_name().unwrap());
         // eprintln!("onion service created: {}", service.onion_name().unwrap());
 
         let stream_requests = tor_hsservice::handle_rend_requests(request_stream);
@@ -190,7 +191,7 @@ impl MessagingClient {
 
                             let _ = http1::Builder::new()
                                 .serve_connection(io, service_fn(|request| async {
-                                    log::log!(log::Level::Info, "request gotten");
+                                    info!("request gotten");
                                     let path = request.uri().path();
                                     if path == "/message" {
                                         let message = request.collect().await.unwrap().to_bytes();
@@ -210,7 +211,7 @@ impl MessagingClient {
                     };
                 }
                 drop(service);
-                eprintln!("onion service dropped");
+                info!("onion service dropped");
             });
         }).expect("error happend during spawning");
 
