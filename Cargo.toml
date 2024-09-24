@@ -24,7 +24,7 @@ rand = "0.8"
 sha3 = "0.10"
 fs-mistrust = "0.7"
 hyper = { version = "1.4", features = ["http1", "server", "client"] }
-tokio = "1.40"
+tokio = { version="1.40", features = ["full"]  }
 http-body-util = "0.1"
 hyper-util = { version = "0.1", features = ["tokio"] }
 base32 = "0.5"
@@ -36,6 +36,7 @@ log = "0.4"
 jni = "0.21"
 jni-sys = "0.3"
 tracing-android = "0.2"
+futures = "0.3.30"
 
 
 

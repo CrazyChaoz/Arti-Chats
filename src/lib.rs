@@ -1,10 +1,9 @@
 use anyhow::Result;
 use arti_client::config::TorClientConfigBuilder;
 use arti_client::{TorClient, TorClientConfig};
-use base64::Engine;
 use fs_mistrust::Mistrust;
+use futures::StreamExt;
 use futures_util::task::SpawnExt;
-use futures_util::StreamExt;
 use http_body_util::BodyExt;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
@@ -14,8 +13,11 @@ use log::info;
 use rand::RngCore;
 use sha3::{Digest, Sha3_256};
 use std::io::Error;
+use std::pin;
+use std::pin::pin;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
+use tokio::runtime::{Handle, Runtime};
 use tor_cell::relaycell::msg::Connected;
 use tor_hsservice::config::OnionServiceConfigBuilder;
 use tor_hsservice::{HsIdKeypairSpecifier, OnionService};
@@ -23,10 +25,13 @@ use tor_keymgr::key_specifier_derive::RawKeySpecifierComponentParser;
 use tor_keymgr::{ArtiEphemeralKeystore, KeyMgrBuilder, KeystoreSelector};
 use tor_llcrypto::pk::ed25519::ExpandedKeypair;
 use tor_proto::stream::{DataStream, IncomingStreamRequest};
-use tor_rtcompat::PreferredRuntime;
-use tracing_subscriber::fmt::{format, Subscriber};
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
+use tor_rtcompat::{BlockOn, PreferredRuntime};
+#[cfg(target_os = "android")]
+use tracing_subscriber::{
+    fmt::Subscriber,
+    layer::SubscriberExt,
+    util::SubscriberInitExt,
+};
 
 #[cfg(target_os = "android")]
 mod java_glue;
@@ -69,10 +74,7 @@ impl MessagingClient {
 
         eprintln!("Starting Tor client");
 
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap();
+        let rt = if let Ok(runtime) = PreferredRuntime::current() { runtime } else { PreferredRuntime::create().expect("could not create async runtime") };
 
         rt.block_on(async {
             let client = TorClient::create_bootstrapped(config).await.unwrap();
@@ -125,7 +127,7 @@ impl MessagingClient {
             "tor-chat-{}",
             onion_address.clone().chars().take(16).collect::<String>()
         );
-        // let handler = Arc::new(WebHandler { messaging_client: Arc::new(self) });
+
         let encodable_key = tor_hscrypto::pk::HsIdKeypair::from(esk);
 
         self.keystore
@@ -157,6 +159,7 @@ impl MessagingClient {
             )
             .build()
             .expect("error building onion service");
+
         let (service, request_stream) = onion_service
             .launch(
                 clone_client.runtime().clone(),
@@ -166,33 +169,43 @@ impl MessagingClient {
             .unwrap();
 
 
+        #[cfg(target_os = "android")]
+        info!( "onion service created: {}", service.onion_name().unwrap());
+
         info!("onion service created: {}", service.onion_name().unwrap());
         eprintln!("onion service created: {}", service.onion_name().unwrap());
+
+        info!("status: {:?}", service.status());
+        eprintln!("status: {:?}", service.status());
 
         #[cfg(target_os = "android")]
         let observer_clone = self.observers.clone();
 
+
         let rt = if let Ok(runtime) = PreferredRuntime::current() { runtime } else { PreferredRuntime::create().expect("could not create async runtime") };
 
-        rt.spawn(async move {
-            info!("entering loop");
-            eprintln!("entering loop");
+        // Create the runtime
+        //let rt  = Runtime::new().unwrap();
 
-            let mut stream_requests = tor_hsservice::handle_rend_requests(request_stream);
+        rt.spawn(async {
+            std::thread::spawn(|| async move {
+                info!("entering loop");
+                eprintln!("entering loop");
 
-            #[cfg(target_os = "android")]
-            info!( "onion service created: {}", service.onion_name().unwrap());
+                tor_hsservice::handle_rend_requests(request_stream).take(3).for_each(|stream_request| async {
+                    #[cfg(target_os = "android")]
+                    let observer_clone = observer_clone.clone();
 
-            let mut pinned = Box::pin(stream_requests);
-            while let Some(stream_request) = pinned.next().await {
-                let request = stream_request.request().clone();
-                let _ = match request {
-                    IncomingStreamRequest::Begin(begin) if begin.port() == 80 => {
-                        let onion_service_stream = stream_request.accept(Connected::new_empty()).await.unwrap();
-                        let io = TokioIo::new(onion_service_stream);
+                    info!("new stream");
+                    eprintln!("new stream");
+                    let request = stream_request.request().clone();
+                    let _ = match request {
+                        IncomingStreamRequest::Begin(begin) if begin.port() == 80 => {
+                            eprintln!("onion_service_stream");
+                            let onion_service_stream = stream_request.accept(Connected::new_empty()).await.unwrap();
+                            let io = TokioIo::new(onion_service_stream);
 
-                        let _ = http1::Builder::new()
-                            .serve_connection(io, service_fn(|request| async {
+                            let _ = http1::Builder::new().serve_connection(io, service_fn(|request| async {
                                 info!("request gotten");
                                 let path = request.uri().path();
                                 if path == "/message" {
@@ -205,15 +218,57 @@ impl MessagingClient {
                                     }
                                 }
                                 Ok::<Response<String>, anyhow::Error>(Response::builder().status(StatusCode::OK).body("Message received".to_string())?)
-                            }));
-                    }
-                    _ => {
-                        stream_request.shutdown_circuit().unwrap();
-                    }
-                };
-            }
-            drop(service);
-            info!("onion service dropped");
+                            })).await.unwrap();
+                        }
+                        _ => {
+                            stream_request.shutdown_circuit().unwrap();
+                        }
+                    };
+                }).await;
+                //
+                // let mut stream_requests = ;
+                //
+                // tokio::pin!(stream_requests);
+                //
+                // while let Some(stream_request) = stream_requests.next().await {
+                //     info!("new stream");
+                //     eprintln!("new stream");
+                //     let request = stream_request.request().clone();
+                //     let _ = match request {
+                //         IncomingStreamRequest::Begin(begin) if begin.port() == 80 => {
+                //             eprintln!("onion_service_stream");
+                //             let onion_service_stream = stream_request.accept(Connected::new_empty()).await.unwrap();
+                //             let io = TokioIo::new(onion_service_stream);
+                //
+                //             let _ = http1::Builder::new().serve_connection(io, service_fn(|request| async {
+                //                 info!("request gotten");
+                //                 let path = request.uri().path();
+                //                 if path == "/message" {
+                //                     let message = request.collect().await.unwrap().to_bytes();
+                //                     let message = String::from_utf8(message.to_vec()).expect("error parsing message");
+                //
+                //                     #[cfg(target_os = "android")]
+                //                     for cb in observer_clone.lock().unwrap().iter() {
+                //                         cb.new_message(&message);
+                //                     }
+                //                 }
+                //                 Ok::<Response<String>, anyhow::Error>(Response::builder().status(StatusCode::OK).body("Message received".to_string())?)
+                //             })).await.unwrap();
+                //         }
+                //         _ => {
+                //             stream_request.shutdown_circuit().unwrap();
+                //         }
+                //     };
+                // }
+                //drop(service);
+
+                // service.status_events().take(4).for_each(|status| async move {
+                //     info!("status: {:?}", status);
+                //     eprintln!("status: {:?}", status);
+                // }).await;
+
+                info!("onion service dropped");
+            }).join().expect("TODO: panic message").await; //.join().expect("TODO: panic message").await; //.;
         }).expect("error while spawning new thread");
 
         clone_onion_address
@@ -313,16 +368,17 @@ mod tests {
 
     #[test]
     fn test_onion_address() {
-        let pk = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31];
+        let pk = vec![42i16; 32];
         let onion_address = MessagingClient::get_onion_address(&pk);
-        assert_eq!(onion_address, "aaaqeayeaudaocajbifqydiob4ibceqtcqkrmfyydenbwha5dyp3kead");
+        assert_eq!(onion_address, "fivcukrkfivcukrkfivcukrkfivcukrkfivcukrkfivcukrkfivjcrid");
     }
 
     #[test]
     fn test_start_server() {
         let mut client = MessagingClient::default();
-        let pk = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31];
+        let pk = vec![42i16; 32];
         let onion_address = MessagingClient::add_onion_v3_from_sk(&mut client, &pk);
-        assert_eq!(onion_address, "aoqqpp7tzyil4hlq3umoos6atft6jvrqtosq2xy53sdgiesvgg4bqead");
+
+        assert_eq!(onion_address, "df7wwi7bnsctfrvlza4pvtk6u6e34ddwwkjagnadtp5iwpjwrvq5bpad");
     }
 }
