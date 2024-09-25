@@ -1,32 +1,27 @@
-use anyhow::Result;
 use arti_client::config::TorClientConfigBuilder;
-use arti_client::{TorClient, TorClientConfig};
+use arti_client::{TorClient};
 use fs_mistrust::Mistrust;
 use futures::StreamExt;
-use futures_util::task::SpawnExt;
 use http_body_util::BodyExt;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
-use hyper::{Request, Response, StatusCode, Uri};
+use hyper::{body, header, Request, Response, StatusCode, Uri};
 use hyper_util::rt::TokioIo;
 use log::info;
 use rand::RngCore;
 use sha3::{Digest, Sha3_256};
-use std::io::Error;
-use std::{future, pin};
-use std::panic;
 use std::pin::pin;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
-use tokio::runtime::{Handle, Runtime};
+use futures_util::task::SpawnExt;
 use tor_cell::relaycell::msg::Connected;
 use tor_hsservice::config::OnionServiceConfigBuilder;
 use tor_hsservice::{HsIdKeypairSpecifier, OnionService};
-use tor_keymgr::key_specifier_derive::RawKeySpecifierComponentParser;
 use tor_keymgr::{ArtiEphemeralKeystore, KeyMgrBuilder, KeystoreSelector};
 use tor_llcrypto::pk::ed25519::ExpandedKeypair;
 use tor_proto::stream::{DataStream, IncomingStreamRequest};
 use tor_rtcompat::{BlockOn, PreferredRuntime};
+
 #[cfg(target_os = "android")]
 use tracing_subscriber::{
     fmt::Subscriber,
@@ -48,32 +43,32 @@ pub struct MessagingClient {
 }
 
 impl MessagingClient {
-
-    pub fn from_custom_cache(cache: &str) -> MessagingClient {
-        let mut config = TorClientConfigBuilder::from_directories(
-            format!("{cache}{}arti-data", std::path::MAIN_SEPARATOR),
-            format!("{cache}{}arti-cache", std::path::MAIN_SEPARATOR),
-        );
-        config.address_filter().allow_onion_addrs(true);
-        let config = config.build().expect("error building tor config");
-
-
-        Self::new(config, cache).expect("error creating MessagingClient")
-    }
-
-
-    pub fn new(config: TorClientConfig, cache_dir: &str) -> Result<MessagingClient, Error> {
+    pub fn new(cache_dir: &str) -> MessagingClient {
         #[cfg(target_os = "android")]
         Subscriber::new()
-            .with(tracing_android::layer("rust.arti")?)
+            .with(tracing_android::layer("rust.arti").expect("error creating android logger"))
             .init(); // this must be called only once, otherwise your app will probably crash
 
         eprintln!("Starting Tor client");
 
         let rt = if let Ok(runtime) = PreferredRuntime::current() { runtime } else { PreferredRuntime::create().expect("could not create async runtime") };
 
+        let mut config = TorClientConfigBuilder::from_directories(
+            format!("{cache_dir}{}arti-data", std::path::MAIN_SEPARATOR),
+            format!("{cache_dir}{}arti-cache", std::path::MAIN_SEPARATOR),
+        );
+        config.address_filter().allow_onion_addrs(true);
+        let config = config.build().expect("error building tor config");
+
+        let binding = TorClient::with_runtime(rt.clone()).config(config);
+        let client_future = binding.create_bootstrapped();
+
         rt.block_on(async {
-            let client = TorClient::create_bootstrapped(config).await.unwrap();
+            let client = client_future.await.unwrap();
+
+            eprintln!("Tor client started");
+            info!("Tor client started");
+
             let keystore_mgr = Arc::new(
                 KeyMgrBuilder::default()
                     .default_store(Box::new(ArtiEphemeralKeystore::new(
@@ -83,23 +78,21 @@ impl MessagingClient {
                     .expect("error building key manager"),
             );
 
-            eprintln!("Tor client started");
-
-            Ok(MessagingClient {
+            MessagingClient {
                 client,
                 keystore: keystore_mgr,
                 cache_dir: cache_dir.to_string(),
                 #[cfg(target_os = "android")]
                 observers: Arc::new(Mutex::new(Vec::new())),
-            })
+            }
         })
     }
 
     pub fn all_in_one(secret_key: &[i16], cache_dir: &str) {
-        #[cfg(target_os = "android")]
-        Subscriber::new()
-            .with(tracing_android::layer("rust.arti").expect("error creating android logger"))
-            .init(); // this must be called only once, otherwise your app will probably crash
+        //#[cfg(target_os = "android")]
+        // Subscriber::new()
+        //     .with(tracing_android::layer("rust.arti").expect("error creating android logger"))
+        //     .init(); // this must be called only once, otherwise your app will probably crash
 
         let rt = if let Ok(runtime) = PreferredRuntime::current() { runtime } else { PreferredRuntime::create().expect("could not create async runtime") };
 
@@ -331,10 +324,6 @@ impl MessagingClient {
             )
             .unwrap();
 
-
-        #[cfg(target_os = "android")]
-        info!( "onion service created: {}", service.onion_name().unwrap());
-
         info!("onion service created: {}", service.onion_name().unwrap());
         eprintln!("onion service created: {}", service.onion_name().unwrap());
 
@@ -345,12 +334,7 @@ impl MessagingClient {
         let observer_clone = self.observers.clone();
 
 
-        let rt = if let Ok(runtime) = PreferredRuntime::current() { runtime } else { PreferredRuntime::create().expect("could not create async runtime") };
-
-        // Create the runtime
-        //let rt  = Runtime::new().unwrap();
-
-        rt.spawn(async move {
+        self.client.clone().runtime().spawn(async move {
             info!("entering loop");
             eprintln!("entering loop");
 
@@ -368,83 +352,42 @@ impl MessagingClient {
 
             tokio::pin!(accepted_streams);
 
-            // while let Some(stream_request) = stream_requests.next().await {
-            let Some(stream_request) = accepted_streams.next().await else {
-                info!("status: {:?}", service.status());
-                eprintln!("status: {:?}", service.status());
-                panic!("heyyyyyyyyyyyyyyy")
-            };
+            while let Some(stream_request) = accepted_streams.next().await {
+                #[cfg(target_os = "android")]
+                let observer_clone = observer_clone.clone();
 
-            #[cfg(target_os = "android")]
-            let observer_clone = observer_clone.clone();
+                info!("new stream");
+                eprintln!("new stream");
+                let request = stream_request.request().clone();
+                let _ = match request {
+                    IncomingStreamRequest::Begin(begin) if begin.port() == 80 => {
+                        eprintln!("onion_service_stream");
+                        let onion_service_stream = stream_request.accept(Connected::new_empty()).await.unwrap();
+                        let io = TokioIo::new(onion_service_stream);
 
-            info!("new stream");
-            eprintln!("new stream");
-            let request = stream_request.request().clone();
-            let _ = match request {
-                IncomingStreamRequest::Begin(begin) if begin.port() == 80 => {
-                    eprintln!("onion_service_stream");
-                    let onion_service_stream = stream_request.accept(Connected::new_empty()).await.unwrap();
-                    let io = TokioIo::new(onion_service_stream);
+                        let _ = http1::Builder::new().serve_connection(io, service_fn(|request| async {
+                            info!("request gotten");
+                            let path = request.uri().path();
+                            if path == "/message" {
+                                let message = request.collect().await.unwrap().to_bytes();
+                                let message = String::from_utf8(message.to_vec()).expect("error parsing message");
 
-                    let _ = http1::Builder::new().serve_connection(io, service_fn(|request| async {
-                        info!("request gotten");
-                        let path = request.uri().path();
-                        if path == "/message" {
-                            let message = request.collect().await.unwrap().to_bytes();
-                            let message = String::from_utf8(message.to_vec()).expect("error parsing message");
-
-                            #[cfg(target_os = "android")]
-                            for cb in observer_clone.lock().unwrap().iter() {
-                                cb.new_message(&message);
+                                #[cfg(target_os = "android")]
+                                for cb in observer_clone.lock().unwrap().iter() {
+                                    cb.new_message(&message);
+                                }
                             }
-                        }
-                        Ok::<Response<String>, anyhow::Error>(Response::builder().status(StatusCode::OK).body("Message received".to_string())?)
-                    })).await.unwrap();
-                }
-                _ => {
-                    stream_request.shutdown_circuit().unwrap();
-                }
-            };
-
-            // let mut stream_requests = ;
-            //
-            // tokio::pin!(stream_requests);
-            //
-            // while let Some(stream_request) = stream_requests.next().await {
-            //     info!("new stream");
-            //     eprintln!("new stream");
-            //     let request = stream_request.request().clone();
-            //     let _ = match request {
-            //         IncomingStreamRequest::Begin(begin) if begin.port() == 80 => {
-            //             eprintln!("onion_service_stream");
-            //             let onion_service_stream = stream_request.accept(Connected::new_empty()).await.unwrap();
-            //             let io = TokioIo::new(onion_service_stream);
-            //
-            //             let _ = http1::Builder::new().serve_connection(io, service_fn(|request| async {
-            //                 info!("request gotten");
-            //                 let path = request.uri().path();
-            //                 if path == "/message" {
-            //                     let message = request.collect().await.unwrap().to_bytes();
-            //                     let message = String::from_utf8(message.to_vec()).expect("error parsing message");
-            //
-            //                     #[cfg(target_os = "android")]
-            //                     for cb in observer_clone.lock().unwrap().iter() {
-            //                         cb.new_message(&message);
-            //                     }
-            //                 }
-            //                 Ok::<Response<String>, anyhow::Error>(Response::builder().status(StatusCode::OK).body("Message received".to_string())?)
-            //             })).await.unwrap();
-            //         }
-            //         _ => {
-            //             stream_request.shutdown_circuit().unwrap();
-            //         }
-            //     };
-            // }
-            //drop(service);
-
+                            Ok::<Response<String>, anyhow::Error>(Response::builder().status(StatusCode::OK).body("Message received".to_string())?)
+                        })).await.unwrap();
+                    }
+                    _ => {
+                        stream_request.shutdown_circuit().unwrap();
+                    }
+                };
+            }
+            drop(service);
             info!("onion service dropped");
-        }).expect("error while spawning new thread");
+        }).expect("error spawning task");
 
         clone_onion_address
     }
@@ -453,7 +396,6 @@ impl MessagingClient {
         let url: Uri = Uri::from_str(recipient).expect("error parsing recipient URL");
         let host = url.host().unwrap();
 
-        info!("url.host().unwrap()");
 
         let stream: DataStream = self.client
             .connect((host, 80))
@@ -461,7 +403,6 @@ impl MessagingClient {
             .expect("connect failed");
 
 
-        info!("connected");
 
         let (mut request_sender, connection) =
             hyper::client::conn::http1::handshake(TokioIo::new(stream)).await.unwrap();
@@ -470,9 +411,6 @@ impl MessagingClient {
         tokio::spawn(async move {
             connection.await.unwrap();
         });
-
-
-        info!("tokio::spawn");
 
         let mut resp = request_sender
             .send_request(
@@ -484,15 +422,24 @@ impl MessagingClient {
             )
             .await.unwrap();
 
-        info!("resp gotten");
+        if let Some(content_type) = resp.headers().get(header::CONTENT_TYPE) {
+            // Convert header value to a string
+            if let Ok(content_type_str) = content_type.to_str() {
+                eprintln!("Content-Type: {}", content_type_str);
+                info!("Content-Type: {}", content_type_str);
+            } else {
+                eprintln!("Content-Type is not a valid string");
+                info!("Content-Type is not a valid string");
+            }
+        } else {
+            eprintln!("Content-Type header is missing");
+            info!("Content-Type header is missing");
+        }
 
         match resp.status().as_u16() {
             200 => {
-                if let Some(frame) = resp.body_mut().frame().await {
-                    let bytes = frame.unwrap().into_data().unwrap();
-                    return std::str::from_utf8(&bytes).unwrap().to_string();
-                }
-                "status 200 but no body".to_string()
+                String::from_utf8(resp.into_body().collect().await.unwrap().to_bytes().into()).expect("error unwrapping response into string")
+                //"status 200 but no body".to_string()
             }
             _ => {
                 "error: status {}".to_string()
@@ -501,14 +448,7 @@ impl MessagingClient {
     }
 
     pub fn send_message(&self, message: String, recipient: String) -> String {
-        // let rt = tokio::runtime::Builder::new_current_thread()
-        //     .enable_all()
-        //     .build()
-        //     .unwrap();
-
-        let rt = if let Ok(runtime) = PreferredRuntime::current() { runtime } else { PreferredRuntime::create().expect("could not create async runtime") };
-
-        rt.block_on(async {
+        self.client.runtime().block_on(async {
             self.send_message_inner(&*message, &*recipient).await
         })
     }
@@ -562,7 +502,7 @@ mod tests {
 
     #[test]
     fn test_start_server() {
-        let mut client = MessagingClient::from_custom_cache(".");
+        let mut client = MessagingClient::new(".");
         let pk = vec![42i16; 32];
         let onion_address = MessagingClient::add_onion_v3_from_sk(&mut client, &pk);
 

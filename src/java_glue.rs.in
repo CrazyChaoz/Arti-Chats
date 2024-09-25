@@ -12,8 +12,7 @@ foreign_callback!(callback MessageObserver {
 
 foreign_class!(class MessagingClient {
     self_type MessagingClient;
-    constructor MessagingClient::from_custom_cache(cache: &str) -> MessagingClient;
-    constructor MessagingClient::default() -> MessagingClient;
+    constructor MessagingClient::new(cache: &str) -> MessagingClient;
     fn MessagingClient::add_onion_v3_from_esk(
         &mut self,
         expanded_secret_key: &[i16],
