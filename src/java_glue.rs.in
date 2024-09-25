@@ -24,6 +24,7 @@ foreign_class!(class MessagingClient {
     ) -> String;
     fn MessagingClient::get_onion_address(public_key: &[i16]) -> String;
     fn MessagingClient::generate_key() -> Vec<i16>;
+    fn MessagingClient::all_in_one(secret_key: &[i16],cache_dir: &str);
     fn MessagingClient::send_message(
         &mut self,
         message: String,
