@@ -17,9 +17,9 @@ fn main() {
                 .join("jku")
                 .join("ins")
                 .join("chat"),
-            "at.jku.ins.chat".into(),
+            "at.jku.ins.chat.ffi".into(),
         )
-            .use_null_annotation_from_package("android.support.annotation".into()),
+            .use_null_annotation_from_package("androidx.annotation".into()),
     ))
         .rustfmt_bindings(true);
     //ANCHOR_END: config

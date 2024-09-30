@@ -70,7 +70,7 @@
                 #singleStep = true; # to catch non-determinism in dependencies
                 overrideMain = _: {
                 preBuild = ''
-                    mkdir -p app/src/main/java/at/jku/ins/chat
+                    mkdir -p app/src/main/java/at/jku/ins/chat/ffi
                     '';
                  postBuild = ''
                   mkdir -p $out/app/src/main/java/at/jku/ins/chat
@@ -93,10 +93,17 @@
 
         embeddedAllAndroid = attributeUtils.mapAttrs (target_name: _:  { embedded = naerskBuildEmbedded target_name; }) targetInfo;
 
-    in {
-        packages.${system}.default = pkgs.linkFarm "android-all-archs" (
+        androidAllArchs = pkgs.linkFarm "android-all-archs" (
             attributeUtils.mapAttrsToList (target_name: t_pkgs: { name = targetInfo.${target_name}.gradle; path = "${t_pkgs.embedded}/lib"; }
             ) embeddedAllAndroid);
+
+    in {
+        #packages.${system}.default = androidAllArchs;
+
+        packages.${system} = {
+        default = androidAllArchs;
+        ffi-files = {};
+        };
 
         devShells.${system}.default =
             let
