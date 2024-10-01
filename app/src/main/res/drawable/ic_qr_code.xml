@@ -1,0 +1,68 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Top-left orientation square -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M3,3h5v5H3V3z M4,4h3v3H4V4z"/>
+
+    <!-- Top-right orientation square -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M16,3h5v5h-5V3z M17,4h3v3h-3V4z"/>
+
+    <!-- Bottom-left orientation square -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M3,16h5v5H3v-5z M4,17h3v3H4v-3z"/>
+
+    <!-- Inner random QR code blocks -->
+    <!-- First row -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M9,3h1v1H9V3z M10,4h1v1h-1V4z M12,3h1v1h-1V3z M13,4h1v1h-1V4z M14,3h1v1h-1V3z"/>
+
+    <!-- Second row -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M9,5h1v1H9V5z M11,6h1v1h-1V6z M12,5h1v1h-1V5z M14,5h1v1h-1V5z"/>
+
+    <!-- Third row -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M10,7h1v1h-1V7z M11,8h1v1h-1V8z M13,7h1v1h-1V7z"/>
+
+    <!-- Fourth row -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M9,9h1v1H9V9z M10,10h1v1h-1V10z M12,9h1v1h-1V9z M14,9h1v1h-1V9z"/>
+
+    <!-- Fifth row -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M9,11h1v1H9v-1z M10,12h1v1h-1v-1z M13,12h1v1h-1v-1z M14,11h1v1h-1v-1z"/>
+
+    <!-- Sixth row -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M9,13h1v1H9v-1z M11,14h1v1h-1v-1z M12,13h1v1h-1v-1z M14,14h1v1h-1v-1z"/>
+
+    <!-- Seventh row -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M10,15h1v1h-1v-1z M13,15h1v1h-1v-1z"/>
+
+    <!-- Eighth row -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M10,17h1v1h-1v-1z M12,17h1v1h-1v-1z M14,17h1v1h-1v-1z"/>
+
+    <!-- Bottom-right random blocks -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M17,16h1v1h-1v-1z M18,18h1v1h-1v-1z M17,14h1v1h-1v-1z M19,16h1v1h-1v-1z"/>
+
+</vector>
