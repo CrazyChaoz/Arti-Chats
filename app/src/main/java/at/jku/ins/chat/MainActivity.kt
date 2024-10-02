@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -37,11 +39,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -54,7 +59,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat.getSystemService
-import at.jku.ins.chat.ffi.MessagingClient
 import at.jku.ins.chat.ui.theme.TorChatTheme
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.integration.android.IntentIntegrator
@@ -63,31 +67,33 @@ import com.google.zxing.qrcode.QRCodeWriter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class Message(val text: String, val isMe: Boolean, var received: Boolean = false)
 
-
 class MainActivity() : ComponentActivity() {
-    private var chatService: MessagingClient? = null
-    private val messages = mutableStateListOf<Message>()
+    private val messages = mutableStateMapOf<String, MutableList<Message>>()
     private var partnerAddress by mutableStateOf("")
     private var chatServiceAddress by mutableStateOf("Own Address")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        System.loadLibrary("magic_chat_rust_lib")
-        val dir=applicationContext.cacheDir.absolutePath
+        messages[""] = mutableStateListOf()
+
+        startService(Intent(this, MessagingService::class.java))
+
         CoroutineScope(Dispatchers.IO).launch {
-            if (chatService == null) {
-                chatService = MessagingClient(dir)
-                chatService!!.subscribe { message ->
-                    println("Received message: $message")
-                    messages.add(Message(message, isMe = false))
-                }
-                chatServiceAddress =
-                    chatService!!.onion_service_from_sk(MessagingClient.generate_key()) + ".onion"
+            while (MessagingService.chatService == null) {
+                println("Waiting for chat service to start")
+                Thread.sleep(1000)
             }
+
+            MessagingService.chatService!!.subscribe { message ->
+                messages[partnerAddress]?.add(Message(message, isMe = false, received = true))
+            }
+
+            chatServiceAddress = MessagingService.ownOnionAddress!!
         }
 
         setContent {
@@ -98,14 +104,30 @@ class MainActivity() : ComponentActivity() {
                     ChatApp(
                         messages = messages,
                         address = partnerAddress,
-                        onAddressChange = { newAddress -> partnerAddress = newAddress },
+                        onAddressChange = { newAddress ->
+                            if (!messages.containsKey(newAddress)) {
+                                messages[newAddress] = mutableStateListOf()
+                            }
+                            if(messages[partnerAddress]!!.isEmpty()) {
+                                messages.remove(partnerAddress)
+                            }
+                            partnerAddress = newAddress
+
+                        },
                         onSend = { newMessage ->
                             if (isValidOnionUrl(partnerAddress)) {
                                 val message = Message(newMessage, isMe = true)
-                                messages.add(message)
+                                messages[partnerAddress]?.add(message)
                                 CoroutineScope(Dispatchers.IO).launch {
-                                    chatService!!.send_message(newMessage, "http://$partnerAddress")
-                                    message.received = true
+                                    MessagingService.chatService?.send_message(
+                                        newMessage,
+                                        "http://$partnerAddress"
+                                    )
+                                    withContext(Dispatchers.Main) {
+                                        message.received = true
+                                        messages[partnerAddress]?.remove(message)
+                                        messages[partnerAddress]?.add(message)
+                                    }
                                 }
                             } else {
                                 println("Invalid address")
@@ -125,23 +147,27 @@ class MainActivity() : ComponentActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         handleQRCodeResult(requestCode, resultCode, data) { newAddress ->
-            println("Scanned address: $newAddress")
+            if (!messages.containsKey(newAddress)) {
+                messages[newAddress] = mutableStateListOf()
+            }
             partnerAddress = newAddress
         }
     }
 }
 
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatApp(
-    messages: List<Message>,
+    messages: SnapshotStateMap<String, MutableList<Message>>,
     address: String,
     onAddressChange: (String) -> Unit,
     onSend: (String) -> Unit,
     onRegenerate: () -> Unit,
     chatServiceAddress: String
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    var topBarExpanded by remember { mutableStateOf(false) }
+    var burgerMenuExpanded by remember { mutableStateOf(false) }
     var showQRCode by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
@@ -154,23 +180,22 @@ fun ChatApp(
                         fontSize = 18.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.clickable { expanded = true }
+                        modifier = Modifier.clickable { topBarExpanded = true }
                     )
                     DropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }
+                        expanded = topBarExpanded,
+                        onDismissRequest = { topBarExpanded = false }
                     ) {
                         DropdownMenuItem(
                             text = { Text("Regenerate") },
                             onClick = {
-                                expanded = false
-                                // Regenerate address logic here
+                                topBarExpanded = false
                                 onRegenerate()
                             })
                         DropdownMenuItem(
                             text = { Text("Copy to Clipboard") },
                             onClick = {
-                                expanded = false
+                                topBarExpanded = false
                                 val clipboard =
                                     getSystemService(context, ClipboardManager::class.java)
                                 val clip = ClipData.newPlainText(
@@ -182,17 +207,28 @@ fun ChatApp(
                         DropdownMenuItem(
                             text = { Text("Generate QR Code") },
                             onClick = {
-                                expanded = false
+                                topBarExpanded = false
                                 showQRCode = true
                             })
                     }
                 }
             }, navigationIcon = {
-                IconButton(onClick = { /* Open burger menu */ }) {
+                IconButton(onClick = { burgerMenuExpanded = true }) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_burger_menu),
                         contentDescription = "Menu"
                     )
+                    DropdownMenu(expanded = burgerMenuExpanded, onDismissRequest = { burgerMenuExpanded = false }) {
+                        messages.keys.filter { it.isNotEmpty() }.forEach { key ->
+                            DropdownMenuItem(
+                                text = { Text(key) },
+                                onClick = {
+                                    burgerMenuExpanded = false
+                                    onAddressChange(key)
+                                }
+                            )
+                        }
+                    }
                 }
             })
             AddressRow(address = address, onAddressChange = onAddressChange)
@@ -203,7 +239,7 @@ fun ChatApp(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            ChatMessages(messages = messages)
+            ChatMessages(messages = messages, address = address)
         }
     }, bottomBar = {
         ChatInput(onSend = onSend)
@@ -228,7 +264,7 @@ fun ChatApp(
 }
 
 fun isValidOnionUrl(address: String): Boolean {
-    val onionRegex = Regex("[a-z2-7]{56}.onion")
+    val onionRegex = Regex("[a-z2-7]{30,}\\.onion")
     return onionRegex.matches(address)
 }
 
@@ -320,11 +356,11 @@ fun handleQRCodeResult(
 }
 
 @Composable
-fun ChatMessages(messages: List<Message>) {
+fun ChatMessages(messages: SnapshotStateMap<String, MutableList<Message>>, address: String) {
     LazyColumn(
         modifier = Modifier.padding(8.dp)
     ) {
-        items(messages) { message ->
+        items(messages[address]!!) { message ->
             ChatBubble(message)
         }
     }
@@ -347,7 +383,7 @@ fun ChatBubble(message: Message) {
             if (message.isMe) {
                 Text(
                     text = if (message.received) "✓" else "⏳",
-                    color = Color.White,
+                    color = Color.Blue,
                     modifier = Modifier.padding(end = 4.dp)
                 )
             }
@@ -370,8 +406,11 @@ fun ChatInput(onSend: (String) -> Unit) {
 
     Row(
         modifier = Modifier
+            .navigationBarsPadding()
+            .imePadding()
             .fillMaxWidth()
-            .padding(8.dp),
+            .padding(8.dp)
+            .background(Color.LightGray),
         verticalAlignment = Alignment.CenterVertically
     ) {
         BasicTextField(
@@ -401,7 +440,7 @@ fun ChatInput(onSend: (String) -> Unit) {
 @Preview(showBackground = true)
 @Composable
 fun GreetingPreview() {
-    val messages = mutableListOf<Message>()
+    val messages = mutableStateMapOf<String, MutableList<Message>>()
     var address by mutableStateOf("")
     TorChatTheme {
         ChatApp(
@@ -409,7 +448,7 @@ fun GreetingPreview() {
             address = address,
             onAddressChange = { newAddress -> address = newAddress },
             onSend = { newMessage ->
-                messages.add(Message(newMessage, isMe = true))
+                messages[""] = mutableStateListOf(Message(newMessage, isMe = true))
             },
             chatServiceAddress = "Title",
             onRegenerate = {
