@@ -179,10 +179,10 @@ impl MessagingClient {
             info!("entering loop");
             eprintln!("entering loop");
 
-            #[cfg(target_os = "android")]
-            for cb in observer_clone.lock().unwrap().iter() {
-                cb.new_message("entering loop");
-            }
+            // #[cfg(target_os = "android")]
+            // for cb in observer_clone.lock().unwrap().iter() {
+            //     cb.new_message("entering loop");
+            // }
 
             // service.status_events().take(1).for_each(|status| async move {
             //     info!("status: {:?}", status);
@@ -256,7 +256,7 @@ impl MessagingClient {
         let mut resp = request_sender
             .send_request(
                 Request::builder()
-                    .uri("/")
+                    .uri("/message")
                     .header("Host", host)
                     .method("GET")
                     .body(message.to_string()).unwrap(),
