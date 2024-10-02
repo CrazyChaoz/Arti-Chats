@@ -73,8 +73,8 @@
                     mkdir -p app/src/main/java/at/jku/ins/chat/ffi
                     '';
                  postBuild = ''
-                  mkdir -p $out/app/src/main/java/at/jku/ins/chat
-                    cp -r app/src/main/java/at/jku/ins/chat/* $out/app/src/main/java/at/jku/ins/chat
+                    mkdir -p $out/app/src/main/java/at/jku/ins/chat/ffi
+                    cp -r app/src/main/java/at/jku/ins/chat/ffi/* $out/app/src/main/java/at/jku/ins/chat/ffi
                     '';
                 };
                 nativeBuildInputs = with pkgs; [ ndk-bundle perl pkg-config ];

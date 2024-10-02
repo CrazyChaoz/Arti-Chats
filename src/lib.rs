@@ -1,3 +1,4 @@
+use std::panic;
 use arti_client::config::TorClientConfigBuilder;
 use arti_client::{TorClient};
 use fs_mistrust::Mistrust;
@@ -42,12 +43,17 @@ pub struct MessagingClient {
     observers: Arc<Mutex<Vec<Box<dyn java_glue::OnEvent>>>>,
 }
 
+
 impl MessagingClient {
+    
     pub fn new(cache_dir: &str) -> MessagingClient {
+
         #[cfg(target_os = "android")]
+        panic::catch_unwind(|| {
         Subscriber::new()
             .with(tracing_android::layer("rust.arti").expect("error creating android logger"))
             .init(); // this must be called only once, otherwise your app will probably crash
+        });
 
         eprintln!("Starting Tor client");
 
@@ -87,6 +93,7 @@ impl MessagingClient {
             }
         })
     }
+    
     pub fn onion_service_from_sk(
         &mut self,
         secret_key: &[i16],
@@ -100,6 +107,7 @@ impl MessagingClient {
         self.onion_service_from_esk(esk.as_slice())
     }
 
+    
     pub fn onion_service_from_esk(
         &mut self,
         expanded_secret_key: &[i16],
@@ -280,11 +288,14 @@ impl MessagingClient {
         }
     }
 
+    
     pub fn send_message(&self, message: String, recipient: String) -> String {
         self.client.runtime().block_on(async {
             self.send_message_inner(&*message, &*recipient).await
         })
     }
+
+    
     pub fn generate_key() -> Vec<i16> {
         let mut rng = rand::thread_rng();
         let mut sk = [0u8; 32];
@@ -294,6 +305,7 @@ impl MessagingClient {
     }
 
 
+    
     pub fn get_onion_address(public_key: &[i16]) -> String {
         let positive_key = public_key.iter().map(|x| x.abs() as u8).collect::<Vec<u8>>();
         let pub_key = <[u8; 32]>::try_from(positive_key).expect("could not convert to [u8; 32]");

@@ -16,7 +16,8 @@ fn main() {
                 .join("at")
                 .join("jku")
                 .join("ins")
-                .join("chat"),
+                .join("chat")
+                .join("ffi"),
             "at.jku.ins.chat.ffi".into(),
         )
             .use_null_annotation_from_package("androidx.annotation".into()),
