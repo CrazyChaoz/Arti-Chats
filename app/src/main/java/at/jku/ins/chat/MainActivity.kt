@@ -14,6 +14,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -63,11 +64,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-data class Message(val text: String, val isMe: Boolean)
+data class Message(val text: String, val isMe: Boolean, var received: Boolean = false)
 
 
-class MainActivity : ComponentActivity() {
-    private lateinit var chatService: MessagingClient
+class MainActivity() : ComponentActivity() {
+    private var chatService: MessagingClient? = null
     private val messages = mutableStateListOf<Message>()
     private var partnerAddress by mutableStateOf("")
     private var chatServiceAddress by mutableStateOf("Own Address")
@@ -76,14 +77,17 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         System.loadLibrary("magic_chat_rust_lib")
-
+        val dir=applicationContext.cacheDir.absolutePath
         CoroutineScope(Dispatchers.IO).launch {
-            chatService = MessagingClient(cacheDir.absolutePath)
-            chatService.subscribe { message ->
-                println("Received message: $message")
-                messages.add(Message(message, isMe = false))
+            if (chatService == null) {
+                chatService = MessagingClient(dir)
+                chatService!!.subscribe { message ->
+                    println("Received message: $message")
+                    messages.add(Message(message, isMe = false))
+                }
+                chatServiceAddress =
+                    chatService!!.onion_service_from_sk(MessagingClient.generate_key()) + ".onion"
             }
-            chatServiceAddress = chatService.onion_service_from_sk(MessagingClient.generate_key())+".onion"
         }
 
         setContent {
@@ -97,8 +101,12 @@ class MainActivity : ComponentActivity() {
                         onAddressChange = { newAddress -> partnerAddress = newAddress },
                         onSend = { newMessage ->
                             if (isValidOnionUrl(partnerAddress)) {
-                                messages.add(Message(newMessage, isMe = true))
-                                chatService.send_message(newMessage, partnerAddress)
+                                val message = Message(newMessage, isMe = true)
+                                messages.add(message)
+                                CoroutineScope(Dispatchers.IO).launch {
+                                    chatService!!.send_message(newMessage, "http://$partnerAddress")
+                                    message.received = true
+                                }
                             } else {
                                 println("Invalid address")
                             }
@@ -163,8 +171,12 @@ fun ChatApp(
                             text = { Text("Copy to Clipboard") },
                             onClick = {
                                 expanded = false
-                                val clipboard = getSystemService(context, ClipboardManager::class.java)
-                                val clip = ClipData.newPlainText("Chat Service Address", chatServiceAddress)
+                                val clipboard =
+                                    getSystemService(context, ClipboardManager::class.java)
+                                val clip = ClipData.newPlainText(
+                                    "Chat Service Address",
+                                    chatServiceAddress
+                                )
                                 clipboard?.setPrimaryClip(clip)
                             })
                         DropdownMenuItem(
@@ -289,7 +301,12 @@ fun startQRCodeScanner(activity: Activity) {
     integrator.initiateScan()
 }
 
-fun handleQRCodeResult(requestCode: Int, resultCode: Int, data: Intent?, onAddressChange: (String) -> Unit) {
+fun handleQRCodeResult(
+    requestCode: Int,
+    resultCode: Int,
+    data: Intent?,
+    onAddressChange: (String) -> Unit
+) {
     val result: IntentResult = IntentIntegrator.parseActivityResult(requestCode, resultCode, data)
     if (result.contents != null) {
         val scannedAddress = result.contents
@@ -322,15 +339,28 @@ fun ChatBubble(message: Message) {
     ) {
         val alignment = if (message.isMe) Alignment.CenterEnd else Alignment.CenterStart
         val backgroundColor = if (message.isMe) Color.Blue else Color.Gray
-        Text(
-            text = message.text,
-            modifier = Modifier
-                .background(backgroundColor)
-                .padding(8.dp),
-            color = Color.White,
-            fontSize = 16.sp,
-            maxLines = 10
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = if (message.isMe) Arrangement.End else Arrangement.Start,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            if (message.isMe) {
+                Text(
+                    text = if (message.received) "✓" else "⏳",
+                    color = Color.White,
+                    modifier = Modifier.padding(end = 4.dp)
+                )
+            }
+            Text(
+                text = message.text,
+                modifier = Modifier
+                    .background(backgroundColor)
+                    .padding(8.dp),
+                color = Color.White,
+                fontSize = 16.sp,
+                maxLines = 10
+            )
+        }
     }
 }
 
