@@ -9,30 +9,34 @@ public final class MessagingClient {
     }
     private static native long init(@NonNull String cache);
 
-    public final @NonNull String onion_service_from_esk(@NonNull short [] expanded_secret_key) {
+    public final @NonNull String onion_service_from_esk(@NonNull byte [] expanded_secret_key) {
         String ret = do_onion_service_from_esk(mNativeObj, expanded_secret_key);
 
         return ret;
     }
-    private static native @NonNull String do_onion_service_from_esk(long self, short [] expanded_secret_key);
+    private static native @NonNull String do_onion_service_from_esk(long self, byte [] expanded_secret_key);
 
-    public final @NonNull String onion_service_from_sk(@NonNull short [] secret_key) {
+    public final @NonNull String onion_service_from_sk(@NonNull byte [] secret_key) {
         String ret = do_onion_service_from_sk(mNativeObj, secret_key);
 
         return ret;
     }
-    private static native @NonNull String do_onion_service_from_sk(long self, short [] secret_key);
+    private static native @NonNull String do_onion_service_from_sk(long self, byte [] secret_key);
 
-    public static native @NonNull String get_onion_address(@NonNull short [] public_key);
+    public static native @NonNull String get_onion_address(@NonNull byte [] public_key);
 
-    public static native short [] generate_key();
+    public static native byte [] generate_key();
 
-    public final @NonNull String send_message(@NonNull String message, @NonNull String onion_address) {
-        String ret = do_send_message(mNativeObj, message, onion_address);
+    public final @NonNull String send_message(@NonNull String message, @NonNull String recipient) {
+        String ret = do_send_message(mNativeObj, message, recipient);
 
         return ret;
     }
-    private static native @NonNull String do_send_message(long self, @NonNull String message, @NonNull String onion_address);
+    private static native @NonNull String do_send_message(long self, @NonNull String message, @NonNull String recipient);
+
+    public static native byte [] get_public_key_from_onion_address(@NonNull String onion_address);
+
+    public static native boolean verify_signature(@NonNull String data, @NonNull byte [] signature, @NonNull byte [] public_key);
 
     public final void subscribe(@NonNull MessageObserver a0) {
         do_subscribe(mNativeObj, a0);
@@ -43,7 +47,7 @@ public final class MessagingClient {
         if (mNativeObj != 0) {
             do_delete(mNativeObj);
             mNativeObj = 0;
-       }
+        }
     }
     @Override
     protected void finalize() throws Throwable {
@@ -51,7 +55,7 @@ public final class MessagingClient {
             delete();
         }
         finally {
-             super.finalize();
+            super.finalize();
         }
     }
     private static native void do_delete(long me);

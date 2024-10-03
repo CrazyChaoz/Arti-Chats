@@ -39,7 +39,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -59,6 +58,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat.getSystemService
+import at.jku.ins.chat.ffi.MessagingClient
 import at.jku.ins.chat.ui.theme.TorChatTheme
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.integration.android.IntentIntegrator
@@ -68,6 +68,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 data class Message(val text: String, val isMe: Boolean, var received: Boolean = false)
 
@@ -76,6 +78,7 @@ class MainActivity() : ComponentActivity() {
     private var partnerAddress by mutableStateOf("")
     private var chatServiceAddress by mutableStateOf("Own Address")
 
+    @OptIn(ExperimentalEncodingApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -90,7 +93,27 @@ class MainActivity() : ComponentActivity() {
             }
 
             MessagingService.chatService!!.subscribe { message ->
-                messages[partnerAddress]?.add(Message(message, isMe = false, received = true))
+                if (message._data_type == "message") {
+                    for (address in messages.keys) {
+                        val publicKey = MessagingClient.get_public_key_from_onion_address(address.dropLast(6))
+                        val signature = Base64.Default.decode(message._signature)
+                        println("Signature: ${message._signature}")
+                        println("PubKey Bytes: ${publicKey.joinToString(separator = "") { byte -> "%02x".format(byte) }}")
+                        println("Signature length: ${signature.size}")
+                        println("Public Key length: ${publicKey.size}")
+
+                        if(MessagingClient.verify_signature(message._data, signature, publicKey)){
+                            messages[address]?.add(
+                                Message(
+                                    message._data,
+                                    isMe = false,
+                                    received = true
+                                )
+                            )
+                        }
+                    }
+
+                }
             }
 
             chatServiceAddress = MessagingService.ownOnionAddress!!
@@ -108,7 +131,7 @@ class MainActivity() : ComponentActivity() {
                             if (!messages.containsKey(newAddress)) {
                                 messages[newAddress] = mutableStateListOf()
                             }
-                            if(messages[partnerAddress]!!.isEmpty()) {
+                            if (messages[partnerAddress]!!.isEmpty()) {
                                 messages.remove(partnerAddress)
                             }
                             partnerAddress = newAddress
@@ -218,7 +241,9 @@ fun ChatApp(
                         painter = painterResource(id = R.drawable.ic_burger_menu),
                         contentDescription = "Menu"
                     )
-                    DropdownMenu(expanded = burgerMenuExpanded, onDismissRequest = { burgerMenuExpanded = false }) {
+                    DropdownMenu(
+                        expanded = burgerMenuExpanded,
+                        onDismissRequest = { burgerMenuExpanded = false }) {
                         messages.keys.filter { it.isNotEmpty() }.forEach { key ->
                             DropdownMenuItem(
                                 text = { Text(key) },

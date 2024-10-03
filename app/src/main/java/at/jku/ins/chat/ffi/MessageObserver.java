@@ -5,6 +5,6 @@ import androidx.annotation.NonNull;
 public interface MessageObserver {
 
 
-    void onStateChanged(@NonNull String s);
+    void onStateChanged(@NonNull ChatMessage s);
 
 }
