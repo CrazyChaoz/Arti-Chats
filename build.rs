@@ -1,7 +1,7 @@
 use flapigen::{JavaConfig, LanguageConfig};
 use std::{env, path::Path};
 
-#[cfg(target_os = "android")]
+
 fn main() {
     env_logger::init();
     let out_dir = env::var("OUT_DIR").unwrap();
@@ -28,7 +28,3 @@ fn main() {
     swig_gen.expand("android bindings", &in_src, &out_src);
     println!("cargo:rerun-if-changed={}", in_src.display());
 }
-
-
-#[cfg(not(target_os = "android"))]
-fn main() {}

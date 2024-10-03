@@ -327,6 +327,12 @@ impl MessagingClient {
         base32::encode(base32::Alphabet::Rfc4648 { padding: false }, &buf).to_ascii_lowercase()
     }
 
+    pub fn get_public_key_from_onion_address(onion_address: &str) -> Vec<i16> {
+        let mut res_vec:Vec<u8> = base32::decode(base32::Alphabet::Rfc4648 { padding: false },onion_address).unwrap_or_default();
+        res_vec.truncate(32);
+        res_vec.iter().map(|x| *x as i16).collect()
+    }
+
     #[cfg(target_os = "android")]
     fn subscribe(&mut self, cb: Box<dyn java_glue::OnEvent>) {
         let mut obs = self.observers.lock().unwrap();
