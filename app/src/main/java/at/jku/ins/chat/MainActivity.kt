@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color.rgb
@@ -18,15 +19,21 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,6 +46,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -95,14 +103,23 @@ class MainActivity() : ComponentActivity() {
             MessagingService.chatService!!.subscribe { message ->
                 if (message._data_type == "message") {
                     for (address in messages.keys) {
-                        val publicKey = MessagingClient.get_public_key_from_onion_address(address.dropLast(6))
+                        val publicKey =
+                            MessagingClient.get_public_key_from_onion_address(address.dropLast(6))
                         val signature = Base64.Default.decode(message._signature)
                         println("Signature: ${message._signature}")
-                        println("PubKey Bytes: ${publicKey.joinToString(separator = "") { byte -> "%02x".format(byte) }}")
+                        println(
+                            "PubKey Bytes: ${
+                                publicKey.joinToString(separator = "") { byte ->
+                                    "%02x".format(
+                                        byte
+                                    )
+                                }
+                            }"
+                        )
                         println("Signature length: ${signature.size}")
                         println("Public Key length: ${publicKey.size}")
 
-                        if(MessagingClient.verify_signature(message._data, signature, publicKey)){
+                        if (MessagingClient.verify_signature(message._data, signature, publicKey)) {
                             messages[address]?.add(
                                 Message(
                                     message._data,
@@ -178,6 +195,115 @@ class MainActivity() : ComponentActivity() {
     }
 }
 
+//
+//@OptIn(ExperimentalMaterial3Api::class)
+//@Composable
+//fun ChatApp(
+//    messages: SnapshotStateMap<String, MutableList<Message>>,
+//    address: String,
+//    onAddressChange: (String) -> Unit,
+//    onSend: (String) -> Unit,
+//    onRegenerate: () -> Unit,
+//    chatServiceAddress: String
+//) {
+//    var topBarExpanded by remember { mutableStateOf(false) }
+//    var burgerMenuExpanded by remember { mutableStateOf(false) }
+//    var showQRCode by remember { mutableStateOf(false) }
+//    val context = LocalContext.current
+//
+//    Scaffold(topBar = {
+//        Column {
+//            TopAppBar(title = {
+//                Box {
+//                    Text(
+//                        text = chatServiceAddress,
+//                        fontSize = 18.sp,
+//                        maxLines = 1,
+//                        overflow = TextOverflow.Ellipsis,
+//                        modifier = Modifier.clickable { topBarExpanded = true }
+//                    )
+//                    DropdownMenu(
+//                        expanded = topBarExpanded,
+//                        onDismissRequest = { topBarExpanded = false }
+//                    ) {
+//                        DropdownMenuItem(
+//                            text = { Text("Regenerate") },
+//                            onClick = {
+//                                topBarExpanded = false
+//                                onRegenerate()
+//                            })
+//                        DropdownMenuItem(
+//                            text = { Text("Copy to Clipboard") },
+//                            onClick = {
+//                                topBarExpanded = false
+//                                val clipboard =
+//                                    getSystemService(context, ClipboardManager::class.java)
+//                                val clip = ClipData.newPlainText(
+//                                    "Chat Service Address",
+//                                    chatServiceAddress
+//                                )
+//                                clipboard?.setPrimaryClip(clip)
+//                            })
+//                        DropdownMenuItem(
+//                            text = { Text("Generate QR Code") },
+//                            onClick = {
+//                                topBarExpanded = false
+//                                showQRCode = true
+//                            })
+//                    }
+//                }
+//            }, navigationIcon = {
+//                IconButton(onClick = { burgerMenuExpanded = true }) {
+//                    Icon(
+//                        painter = painterResource(id = R.drawable.ic_burger_menu),
+//                        contentDescription = "Menu"
+//                    )
+//                    DropdownMenu(
+//                        expanded = burgerMenuExpanded,
+//                        onDismissRequest = { burgerMenuExpanded = false }) {
+//                        messages.keys.filter { it.isNotEmpty() }.forEach { key ->
+//                            DropdownMenuItem(
+//                                text = { Text(key) },
+//                                onClick = {
+//                                    burgerMenuExpanded = false
+//                                    onAddressChange(key)
+//                                }
+//                            )
+//                        }
+//                    }
+//                }
+//            })
+//            AddressRow(address = address, onAddressChange = onAddressChange)
+//        }
+//    }, content = { paddingValues ->
+//        Column(
+//            modifier = Modifier
+//                .fillMaxSize()
+//                .padding(paddingValues)
+//        ) {
+//            ChatMessages(messages = messages, address = address)
+//        }
+//    }, bottomBar = {
+//        ChatInput(onSend = onSend)
+//    })
+//
+//    if (showQRCode) {
+//        AlertDialog(
+//            onDismissRequest = { showQRCode = false },
+//            confirmButton = {
+//                TextButton(onClick = { showQRCode = false }) {
+//                    Text("Close")
+//                }
+//            },
+//            title = {
+//                Text("Your Chat Service Address")
+//            },
+//            text = {
+//                GenerateQRCode(chatServiceAddress)
+//            }
+//        )
+//    }
+//}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -190,73 +316,85 @@ fun ChatApp(
     chatServiceAddress: String
 ) {
     var topBarExpanded by remember { mutableStateOf(false) }
-    var burgerMenuExpanded by remember { mutableStateOf(false) }
+    var addContactExpanded by remember { mutableStateOf(false) }
     var showQRCode by remember { mutableStateOf(false) }
+    var showOwnAddress by remember { mutableStateOf(false) }
+    var addressListExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     Scaffold(topBar = {
         Column {
             TopAppBar(title = {
-                Box {
-                    Text(
-                        text = chatServiceAddress,
-                        fontSize = 18.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.clickable { topBarExpanded = true }
+                Text(
+                    text = address.ifEmpty { "Main Menu" },
+                    fontSize = 18.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.clickable { /*topBarExpanded = true */ }
+                )
+            }, navigationIcon = {
+                IconButton(onClick = { topBarExpanded = true }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_burger_menu),
+                        contentDescription = "Menu"
                     )
                     DropdownMenu(
                         expanded = topBarExpanded,
                         onDismissRequest = { topBarExpanded = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Regenerate") },
+                            text = { Text("Add Contact") },
                             onClick = {
                                 topBarExpanded = false
-                                onRegenerate()
+                                addContactExpanded = true
                             })
                         DropdownMenuItem(
-                            text = { Text("Copy to Clipboard") },
+                            text = { Text("List Contacts") },
                             onClick = {
                                 topBarExpanded = false
-                                val clipboard =
-                                    getSystemService(context, ClipboardManager::class.java)
-                                val clip = ClipData.newPlainText(
-                                    "Chat Service Address",
-                                    chatServiceAddress
-                                )
-                                clipboard?.setPrimaryClip(clip)
+                                addressListExpanded = true
                             })
                         DropdownMenuItem(
-                            text = { Text("Generate QR Code") },
+                            text = { Text("Show Own Address") },
                             onClick = {
                                 topBarExpanded = false
-                                showQRCode = true
+                                showOwnAddress = true
                             })
                     }
-                }
-            }, navigationIcon = {
-                IconButton(onClick = { burgerMenuExpanded = true }) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_burger_menu),
-                        contentDescription = "Menu"
-                    )
                     DropdownMenu(
-                        expanded = burgerMenuExpanded,
-                        onDismissRequest = { burgerMenuExpanded = false }) {
+                        expanded = addressListExpanded,
+                        onDismissRequest = { addressListExpanded = false }
+                    ) {
                         messages.keys.filter { it.isNotEmpty() }.forEach { key ->
                             DropdownMenuItem(
                                 text = { Text(key) },
                                 onClick = {
-                                    burgerMenuExpanded = false
+                                    addressListExpanded = false
                                     onAddressChange(key)
                                 }
                             )
                         }
                     }
+                    DropdownMenu(
+                        expanded = addContactExpanded,
+                        onDismissRequest = { addContactExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Add via QR Code") },
+                            onClick = {
+                                addContactExpanded = false
+                                startQRCodeScanner(context as Activity)
+                            })
+                        DropdownMenuItem(
+                            text = { Text("Add Manually") },
+                            onClick = {
+                                addContactExpanded = false
+                                // Handle adding manually
+                            })
+                    }
                 }
             })
-            AddressRow(address = address, onAddressChange = onAddressChange)
+            //AddressRow(address = address, onAddressChange = onAddressChange)
         }
     }, content = { paddingValues ->
         Column(
@@ -286,13 +424,69 @@ fun ChatApp(
             }
         )
     }
+
+    if (showOwnAddress) {
+        AlertDialog(
+            onDismissRequest = { showOwnAddress = false },
+            confirmButton = {
+                TextButton(onClick = { showOwnAddress = false }) {
+                    Text("Close")
+                }
+            },
+            title = {
+                Text("Your Chat Service Address")
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = chatServiceAddress,
+                        modifier = Modifier
+                            .padding(vertical = 16.dp)
+                    )
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        Button(onClick = { showQRCode = true }) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_qr_code),
+                                contentDescription = null
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Show QR Code")
+                        }
+                        Button(onClick = { onRegenerate() }) {
+                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Regenerate")
+                        }
+                        Button(onClick = {
+                            val clipboard =
+                                getSystemService(context, ClipboardManager::class.java)
+                            val clip = ClipData.newPlainText(
+                                "Chat Service Address",
+                                chatServiceAddress
+                            )
+                            clipboard?.setPrimaryClip(clip)
+                        }) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Copy to Clipboard")
+                        }
+                    }
+                }
+            }
+        )
+    }
 }
 
 fun isValidOnionUrl(address: String): Boolean {
     val onionRegex = Regex("[a-z2-7]{30,}\\.onion")
     return onionRegex.matches(address)
 }
-
 
 @Composable
 fun GenerateQRCode(text: String) {
@@ -317,7 +511,6 @@ fun GenerateQRCode(text: String) {
 
 @Composable
 fun AddressRow(address: String, onAddressChange: (String) -> Unit) {
-    val activity = LocalContext.current as Activity
 
     Row(
         modifier = Modifier
@@ -335,7 +528,7 @@ fun AddressRow(address: String, onAddressChange: (String) -> Unit) {
                 .background(Color.White)
         )
 
-        IconButton(onClick = { startQRCodeScanner(activity) }) {
+        IconButton(onClick = {  }) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_qr_code),
                 contentDescription = "QR Code Scan"
@@ -461,24 +654,24 @@ fun ChatInput(onSend: (String) -> Unit) {
     }
 }
 
-@SuppressLint("UnrememberedMutableState")
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    val messages = mutableStateMapOf<String, MutableList<Message>>()
-    var address by mutableStateOf("")
-    TorChatTheme {
-        ChatApp(
-            messages = messages,
-            address = address,
-            onAddressChange = { newAddress -> address = newAddress },
-            onSend = { newMessage ->
-                messages[""] = mutableStateListOf(Message(newMessage, isMe = true))
-            },
-            chatServiceAddress = "Title",
-            onRegenerate = {
-                println("TODO: Regenerate address")
-            }
-        )
-    }
-}
+//@SuppressLint("UnrememberedMutableState")
+//@Preview(showBackground = true)
+//@Composable
+//fun GreetingPreview() {
+//    val messages = mutableStateMapOf<String, MutableList<Message>>()
+//    var address by mutableStateOf("")
+//    TorChatTheme {
+//        ChatApp(
+//            messages = messages,
+//            address = address,
+//            onAddressChange = { newAddress -> address = newAddress },
+//            onSend = { newMessage ->
+//                messages[""] = mutableStateListOf(Message(newMessage, isMe = true))
+//            },
+//            chatServiceAddress = "Title",
+//            onRegenerate = {
+//                println("TODO: Regenerate address")
+//            }
+//        )
+//    }
+//}
