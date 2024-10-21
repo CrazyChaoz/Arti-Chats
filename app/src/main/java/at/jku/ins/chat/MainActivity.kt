@@ -320,6 +320,7 @@ fun ChatApp(
     var showQRCode by remember { mutableStateOf(false) }
     var showOwnAddress by remember { mutableStateOf(false) }
     var addressListExpanded by remember { mutableStateOf(false) }
+    var showAddManuallyPopup by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     Scaffold(topBar = {
@@ -389,12 +390,12 @@ fun ChatApp(
                             text = { Text("Add Manually") },
                             onClick = {
                                 addContactExpanded = false
+                                showAddManuallyPopup = true
                                 // Handle adding manually
                             })
                     }
                 }
             })
-            //AddressRow(address = address, onAddressChange = onAddressChange)
         }
     }, content = { paddingValues ->
         Column(
@@ -407,6 +408,19 @@ fun ChatApp(
     }, bottomBar = {
         ChatInput(onSend = onSend)
     })
+
+    if (showAddManuallyPopup) {
+        AddManuallyPopup(
+            onDismiss = { showAddManuallyPopup = false },
+            onAddContact = { newAddress, nickname ->
+                if (!messages.containsKey(newAddress)) {
+                    messages[newAddress] = mutableStateListOf()
+                }
+                // Handle nickname if needed
+                showAddManuallyPopup = false
+            }
+        )
+    }
 
     if (showQRCode) {
         AlertDialog(
@@ -486,6 +500,64 @@ fun ChatApp(
 fun isValidOnionUrl(address: String): Boolean {
     val onionRegex = Regex("[a-z2-7]{30,}\\.onion")
     return onionRegex.matches(address)
+}
+
+
+@Composable
+fun AddManuallyPopup(onDismiss: () -> Unit, onAddContact: (String, String) -> Unit) {
+    var address by remember { mutableStateOf("") }
+    var nickname by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = {
+                onAddContact(address, nickname)
+            }) {
+                Text("Add")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+        title = {
+            Text("Add Contact Manually")
+        },
+        text = {
+            Column {
+                BasicTextField(
+                    value = address,
+                    onValueChange = { address = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp)
+                        .background(Color.White),
+                    decorationBox = { innerTextField ->
+                        if (address.isEmpty()) {
+                            Text("Address", color = Color.Gray)
+                        }
+                        innerTextField()
+                    }
+                )
+                BasicTextField(
+                    value = nickname,
+                    onValueChange = { nickname = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp)
+                        .background(Color.White),
+                    decorationBox = { innerTextField ->
+                        if (nickname.isEmpty()) {
+                            Text("Nickname", color = Color.Gray)
+                        }
+                        innerTextField()
+                    }
+                )
+            }
+        }
+    )
 }
 
 @Composable
