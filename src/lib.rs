@@ -8,13 +8,12 @@ use futures_util::task::SpawnExt;
 use http_body_util::BodyExt;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
-use hyper::{body, header, Request, Response, StatusCode, Uri};
+use hyper::{header, Request, Response, StatusCode, Uri};
 use hyper_util::rt::TokioIo;
 use log::{error, info};
 use rand::RngCore;
 use sha3::{Digest, Sha3_256};
 use std::panic;
-use std::pin::pin;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use tor_cell::relaycell::msg::Connected;
@@ -24,63 +23,64 @@ use tor_keymgr::{ArtiEphemeralKeystore, KeyMgrBuilder, KeystoreSelector};
 use tor_llcrypto::pk::ed25519::ExpandedKeypair;
 use tor_proto::stream::{DataStream, IncomingStreamRequest};
 use tor_rtcompat::{BlockOn, PreferredRuntime};
-
-#[cfg(target_os = "android")]
 use tracing_subscriber::{
     fmt::Subscriber,
     layer::SubscriberExt,
     util::SubscriberInitExt,
 };
 
-#[cfg(target_os = "android")]
-mod java_glue;
-#[cfg(target_os = "android")]
-pub use crate::java_glue::*;
 
+#[uniffi::export(callback_interface)]
+pub trait OnEvent: Send {
+    fn new_message(&self, s: ChatMessage);
+}
+
+#[derive(uniffi::Record)]
 #[derive(Clone)]
 pub struct ChatMessage {
     pub signature: String,
     pub data_type: String,
     pub data: String,
 }
+// #[uniffi::export]
+// impl ChatMessage {
+//     #[uniffi::constructor]
+//     pub fn new(signature: String, data_type: String, data: String) -> Self {
+//         ChatMessage { signature, data_type, data }
+//     }
+//
+//     pub fn get_signature(&mut self) -> String {
+//         self.signature.clone()
+//     }
+//
+//     pub fn get_data_type(&mut self) -> String {
+//         self.data_type.clone()
+//     }
+//
+//     pub fn get_data(&mut self) -> String {
+//         self.data.clone()
+//     }
+// }
 
-impl ChatMessage {
-    pub fn new(mut signature: String, mut data_type: String, mut data: String) -> Self {
-        ChatMessage { signature, data_type, data }
-    }
-
-    pub fn get_signature(&mut self) -> String {
-        self.signature.clone()
-    }
-
-    pub fn get_data_type(&mut self) -> String {
-        self.data_type.clone()
-    }
-
-    pub fn get_data(&mut self) -> String {
-        self.data.clone()
-    }
-}
-
-
+#[derive(uniffi::Object)]
 pub struct MessagingClient {
     client: TorClient<PreferredRuntime>,
     keystore: Arc<tor_keymgr::KeyMgr>,
     cache_dir: String,
-    key_pair: Option<Arc<ExpandedKeypair>>,
-    #[cfg(target_os = "android")]
-    observers: Arc<Mutex<Vec<Box<dyn java_glue::OnEvent>>>>,
+    key_pair:  Arc<Mutex<Option<[u8; 64]>>>,
+    observers: Arc<Mutex<Vec<Box<dyn OnEvent>>>>,
 }
 
-
+#[uniffi::export]
 impl MessagingClient {
+    #[uniffi::constructor]
     pub fn new(cache_dir: &str) -> MessagingClient {
-        #[cfg(target_os = "android")]
-        panic::catch_unwind(|| {
-            Subscriber::new()
-                .with(tracing_android::layer("rust.arti").expect("error creating android logger"))
-                .init(); // this must be called only once, otherwise your app will probably crash
-        });
+        // #[cfg(target_os = "android")]
+        // panic::catch_unwind(|| {
+        //     Subscriber::new()
+        //         .with(tracing_android::layer("rust.arti").expect("error creating android logger"))
+        //         .init(); // this must be called only once, otherwise your app will probably crash
+        // });
 
         eprintln!("Starting Tor client");
 
@@ -115,15 +115,14 @@ impl MessagingClient {
                 client,
                 keystore: keystore_mgr,
                 cache_dir: cache_dir.to_string(),
-                key_pair: None,
-                #[cfg(target_os = "android")]
+                key_pair: Arc::new(Mutex::new(None)),
                 observers: Arc::new(Mutex::new(Vec::new())),
             }
         })
     }
 
     pub fn onion_service_from_sk(
-        &mut self,
+        &self,
         secret_key: &[u8],
     ) -> String {
         let sk = <[u8; 32]>::try_from(secret_key).expect("could not convert to [u8; 32]");
@@ -136,7 +135,7 @@ impl MessagingClient {
 
 
     pub fn onion_service_from_esk(
-        &mut self,
+        &self,
         expanded_secret_key: &[u8],
     ) -> String {
         let expanded_secret = <[u8; 64]>::try_from(expanded_secret_key).expect("could not convert to [u8; 64]");
@@ -144,10 +143,11 @@ impl MessagingClient {
             .expect("error converting to ExpandedKeypair");
         let pk = esk.public();
 
-        self.key_pair = Some(Arc::new(ExpandedKeypair::from_secret_key_bytes(expanded_secret)
-            .expect("error converting to ExpandedKeypair")));
 
-        let onion_address = MessagingClient::get_onion_address(&pk.to_bytes());
+        let mut value =self.key_pair.lock().unwrap();
+        *value = Some(expanded_secret);
+
+        let onion_address = get_onion_address(&pk.to_bytes());
         let clone_onion_address = onion_address.clone();
         let nickname = format!(
             "tor-chat-{}",
@@ -200,9 +200,7 @@ impl MessagingClient {
         info!("status: {:?}", service.status());
         eprintln!("status: {:?}", service.status());
 
-        #[cfg(target_os = "android")]
         let observer_clone = self.observers.clone();
-
 
         self.client.clone().runtime().spawn(async move {
             info!("entering loop");
@@ -223,7 +221,6 @@ impl MessagingClient {
             tokio::pin!(accepted_streams);
 
             while let Some(stream_request) = accepted_streams.next().await {
-                #[cfg(target_os = "android")]
                 let observer_clone = observer_clone.clone();
 
                 info!("new stream");
@@ -244,9 +241,12 @@ impl MessagingClient {
                                 let message = request.collect().await.unwrap().to_bytes();
                                 let message = String::from_utf8(message.to_vec()).expect("error parsing message");
                                 if let Some(signature) = signature {
-                                    let message = ChatMessage::new(signature.to_str().expect("error converting signature to string").to_string(),
-                                                                   "message".to_string(), message);
-                                    #[cfg(target_os = "android")]
+                                    let signature = signature.to_str().expect("error converting signature to string").to_string();
+                                    let data_type = "message".to_string();
+                                    let data = message;
+
+                                    let message = ChatMessage { signature, data_type, data };
+
                                     for cb in observer_clone.lock().unwrap().iter() {
                                         cb.new_message(message.clone());
                                     }
@@ -267,7 +267,7 @@ impl MessagingClient {
         clone_onion_address
     }
 
-    pub async fn send_message_inner(&mut self, message: &str, recipient: &str) -> String {
+    pub async fn send_message_inner(&self, message: &str, recipient: &str) -> String {
         let url: Uri = Uri::from_str(recipient).expect("error parsing recipient URL");
         let host = url.host().unwrap();
 
@@ -287,12 +287,14 @@ impl MessagingClient {
         });
 
 
-        let mut resp = request_sender
+        let key = ExpandedKeypair::from_secret_key_bytes(self.key_pair.lock().unwrap().expect("could not borrow key")).unwrap();
+
+        let resp = request_sender
             .send_request(
                 Request::builder()
                     .uri("/message")
                     .header("Host", host)
-                    .header("X-Signature-Ed25519", base64::prelude::BASE64_STANDARD.encode(self.key_pair.clone().expect("The current Keypair is None; apparently there is no onion service running").sign(message.as_bytes()).to_bytes()))
+                    .header("X-Signature-Ed25519", base64::prelude::BASE64_STANDARD.encode(key.sign(message.as_bytes()).to_bytes()))
                     .method("GET")
                     .body(message.to_string()).unwrap(),
             )
@@ -318,76 +320,75 @@ impl MessagingClient {
                 //"status 200 but no body".to_string()
             }
             _ => {
-                "error: status {}".to_string()
+                format!("error: status {}", resp.status().as_u16())
             }
         }
     }
 
 
-    pub fn send_message(&mut self, message: &str, recipient: &str) -> String {
+    pub fn send_message(&self, message: &str, recipient: &str) -> String {
         let runtime = self.client.runtime().clone();
         runtime.block_on(async {
             self.send_message_inner(message, recipient).await
         })
     }
 
-
-    pub fn generate_key() -> Vec<u8> {
-        let mut rng = rand::thread_rng();
-        let mut sk = [0u8; 32];
-        rng.fill_bytes(&mut sk);
-        sk.to_vec()
-    }
-
-    pub fn get_onion_address(public_key: &[u8]) -> String {
-        let pub_key = <[u8; 32]>::try_from(public_key).expect("could not convert to [u8; 32]");
-        let mut buf = [0u8; 35];
-        pub_key.iter().copied().enumerate().for_each(|(i, b)| {
-            buf[i] = b;
-        });
-
-        let mut h = Sha3_256::new();
-        h.update(b".onion checksum");
-        h.update(pub_key);
-        h.update(b"\x03");
-
-        let res_vec = h.finalize().to_vec();
-        buf[32] = res_vec[0];
-        buf[33] = res_vec[1];
-        buf[34] = 3;
-
-        base32::encode(base32::Alphabet::Rfc4648 { padding: false }, &buf).to_ascii_lowercase()
-    }
-
-    pub fn get_public_key_from_onion_address(onion_address: &str) -> Vec<u8> {
-        panic::catch_unwind(|| {
-            let mut res_vec: Vec<u8> = base32::decode(base32::Alphabet::Rfc4648Lower { padding: false }, &*onion_address.to_ascii_lowercase()).unwrap_or_else(|| {
-                eprintln!("error: {onion_address} could not convert from base32");
-                Vec::<u8>::new()
-            });
-            res_vec.truncate(32);
-            res_vec
-        }).unwrap_or_else(|cause| {
-            error!("{:?}", cause);
-            Vec::<u8>::new()
-        })
-    }
-
-    pub fn verify_signature(data: &str, signature: &[u8], public_key: &[u8]) -> bool {
-        panic::catch_unwind(|| {
-            let verifying_key = VerifyingKey::try_from(public_key).expect("could not convert public key");
-            verifying_key.verify(data.as_bytes(), &Signature::try_from(signature).expect("signature bytes could not be converted")).is_ok()
-        }).unwrap_or_else(|cause| {
-            error!("{:?}", cause);
-            false
-        })
-    }
-
-    #[cfg(target_os = "android")]
-    fn subscribe(&mut self, cb: Box<dyn java_glue::OnEvent>) {
+    pub fn subscribe(&self, cb: Box<dyn OnEvent>) {
         let mut obs = self.observers.lock().unwrap();
         obs.push(cb);
     }
+}
+
+#[uniffi::export]
+pub fn generate_key() -> Vec<u8> {
+    let mut rng = rand::thread_rng();
+    let mut sk = [0u8; 32];
+    rng.fill_bytes(&mut sk);
+    sk.to_vec()
+}
+#[uniffi::export]
+pub fn get_onion_address(public_key: &[u8]) -> String {
+    let pub_key = <[u8; 32]>::try_from(public_key).expect("could not convert to [u8; 32]");
+    let mut buf = [0u8; 35];
+    pub_key.iter().copied().enumerate().for_each(|(i, b)| {
+        buf[i] = b;
+    });
+
+    let mut h = Sha3_256::new();
+    h.update(b".onion checksum");
+    h.update(pub_key);
+    h.update(b"\x03");
+
+    let res_vec = h.finalize().to_vec();
+    buf[32] = res_vec[0];
+    buf[33] = res_vec[1];
+    buf[34] = 3;
+
+    base32::encode(base32::Alphabet::Rfc4648 { padding: false }, &buf).to_ascii_lowercase()
+}
+#[uniffi::export]
+pub fn get_public_key_from_onion_address(onion_address: &str) -> Vec<u8> {
+    panic::catch_unwind(|| {
+        let mut res_vec: Vec<u8> = base32::decode(base32::Alphabet::Rfc4648Lower { padding: false }, &*onion_address.to_ascii_lowercase()).unwrap_or_else(|| {
+            eprintln!("error: {onion_address} could not convert from base32");
+            Vec::<u8>::new()
+        });
+        res_vec.truncate(32);
+        res_vec
+    }).unwrap_or_else(|cause| {
+        error!("{:?}", cause);
+        Vec::<u8>::new()
+    })
+}
+#[uniffi::export]
+pub fn verify_signature(data: &str, signature: &[u8], public_key: &[u8]) -> bool {
+    panic::catch_unwind(|| {
+        let verifying_key = VerifyingKey::try_from(public_key).expect("could not convert public key");
+        verifying_key.verify(data.as_bytes(), &Signature::try_from(signature).expect("signature bytes could not be converted")).is_ok()
+    }).unwrap_or_else(|cause| {
+        error!("{:?}", cause);
+        false
+    })
 }
 
 #[cfg(test)]
@@ -397,7 +398,7 @@ mod tests {
     #[test]
     fn test_onion_address() {
         let pk = vec![42u8; 32];
-        let onion_address = MessagingClient::get_onion_address(&pk);
+        let onion_address = get_onion_address(&pk);
         assert_eq!(onion_address, "fivcukrkfivcukrkfivcukrkfivcukrkfivcukrkfivcukrkfivjcrid");
     }
 
@@ -410,3 +411,5 @@ mod tests {
         assert_eq!(onion_address, "df7wwi7bnsctfrvlza4pvtk6u6e34ddwwkjagnadtp5iwpjwrvq5bpad");
     }
 }
+
+uniffi::setup_scaffolding!();

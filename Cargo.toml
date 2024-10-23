@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-arti-client = { version="0.22.0", features=["onion-service-service","onion-service-client","static","experimental-api"] }
+arti-client = { version="0.22", features=["onion-service-service","onion-service-client","static","experimental-api"] }
 tor-cell = "0.22"
 tor-hsservice = "0.22"
 tor-proto = "0.22"
@@ -34,17 +34,18 @@ futures-util = "0.3.30"
 env_logger = "0.11.5"
 log = "0.4"
 futures = "0.3.30"
+uniffi = {version = "0.28.2" }
 
 
 # dependancies specific to iOS
 [target.'cfg(target_os = "ios")'.dependencies]
-#tracing-oslog = "0.1.2"
+tracing-oslog = "0.2.0"
 
 
 # dependancies specific to Android
 [target.'cfg(target_os = "android")'.dependencies]
 jni = "0.21"
-jni-sys = "0.3"
+jni-sys = "0.4.0"
 tracing-android = "0.2"
 
 # dependancy to help implementing lockf, for android < 7.0
@@ -53,12 +54,13 @@ tracing-android = "0.2"
 
 [lib]
 # dylib is for Android, staticlib is for iOS
-crate-type = ["cdylib"]
+crate-type = ["cdylib"]#,"staticlib"]
+name = "tor_chat"
+
 
 [build-dependencies]
-env_logger = "0.11.5"
-flapigen = "0.7"
-log = "0.4"
-jni = "0.21"
-jni-sys = "0.3"
-bindgen = "0.52"
+uniffi = {version = "0.28.2", features = [ "build" ] }
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "uniffi-bindgen.rs"
