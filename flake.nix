@@ -68,15 +68,15 @@
                 cargoBuildOptions = lst: lst ++ [ "--package ${cargoPackage}"  ];
                 cargoTestOptions = lst: lst ++ [ "--package ${cargoPackage}" ];
                 #singleStep = true; # to catch non-determinism in dependencies
-                overrideMain = _: {
-                preBuild = ''
-                    mkdir -p app/src/main/java/at/jku/ins/chat/ffi
-                    '';
-                 postBuild = ''
-                    mkdir -p $out/app/src/main/java/at/jku/ins/chat/ffi
-                    cp -r app/src/main/java/at/jku/ins/chat/ffi/* $out/app/src/main/java/at/jku/ins/chat/ffi
-                    '';
-                };
+#                overrideMain = _: {
+#                preBuild = ''
+#                    mkdir -p app/src/main/java/at/jku/ins/chat/ffi
+#                    '';
+#                 postBuild = ''
+#                    mkdir -p $out/app/src/main/java/at/jku/ins/chat/ffi
+#                    cp -r app/src/main/java/at/jku/ins/chat/ffi/* $out/app/src/main/java/at/jku/ins/chat/ffi
+#                    '';
+#                };
                 nativeBuildInputs = with pkgs; [ ndk-bundle perl pkg-config ];
                 #buildInputs = with pkgs; [ openssl ];
 

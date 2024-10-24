@@ -61,6 +61,6 @@ name = "tor_chat"
 [build-dependencies]
 uniffi = {version = "0.28.2", features = [ "build" ] }
 
-[[bin]]
-name = "uniffi-bindgen"
-path = "uniffi-bindgen.rs"
+#[[bin]]
+#name = "uniffi-bindgen"
+#path = "uniffi-bindgen.rs"
