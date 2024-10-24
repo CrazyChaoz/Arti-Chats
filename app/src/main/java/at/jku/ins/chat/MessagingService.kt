@@ -9,18 +9,18 @@ import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
 import android.os.Build
 import android.os.IBinder
 import androidx.annotation.RequiresApi
-import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
-import at.jku.ins.chat.ffi.MessagingClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import uniffi.tor_chat.MessagingClient
+import uniffi.tor_chat.generateKey
 
 
 class MessagingService : Service() {
 
 
-    @RequiresApi(Build.VERSION_CODES.Q)
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // Handle start command if needed
 
@@ -28,12 +28,12 @@ class MessagingService : Service() {
             return START_STICKY
         }
 
-        System.loadLibrary("magic_chat_rust_lib")
+        System.loadLibrary("tor_chat")
 
         CoroutineScope(Dispatchers.IO).launch {
             chatService = MessagingClient(cacheDir.absolutePath)
 
-            ownOnionAddress = chatService!!.onion_service_from_sk(MessagingClient.generate_key())+".onion"
+            ownOnionAddress = chatService!!.onionServiceFromSk(generateKey())+".onion"
         }
 
         if (intent != null) {
@@ -65,7 +65,7 @@ class MessagingService : Service() {
         val builder =
             NotificationCompat
                 .Builder(this, "torchat")
-                .setContentTitle("TorCaht")
+                .setContentTitle("TorChat")
                 .setContentText("Running...")
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -74,11 +74,13 @@ class MessagingService : Service() {
                 .addAction(R.drawable.ic_launcher_foreground, "Kill Service", stopPendingIntent)
 
         // Start the service in the foreground
-        startForeground(
-            1,
-            builder.build(),
-            FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
-        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                1,
+                builder.build(),
+                FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+            )
+        }
         isServiceRunning = true
         return START_STICKY
     }

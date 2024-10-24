@@ -66,7 +66,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat.getSystemService
-import at.jku.ins.chat.ffi.MessagingClient
+//import at.jku.ins.chat.ffi.MessagingClient
 import at.jku.ins.chat.ui.theme.TorChatTheme
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.integration.android.IntentIntegrator
@@ -76,10 +76,22 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import uniffi.tor_chat.ChatMessage
+import uniffi.tor_chat.MessagingClient
+import uniffi.tor_chat.OnEvent
+import uniffi.tor_chat.getPublicKeyFromOnionAddress
+import uniffi.tor_chat.uniffiCallbackInterfaceOnEvent.newMessage
+import uniffi.tor_chat.verifySignature
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 data class Message(val text: String, val isMe: Boolean, var received: Boolean = false)
+
+class Cb(): OnEvent {
+    override fun newMessage(s: ChatMessage) {
+        TODO("Not yet implemented")
+    }
+}
 
 class MainActivity() : ComponentActivity() {
     private val messages = mutableStateMapOf<String, MutableList<Message>>()
@@ -100,38 +112,40 @@ class MainActivity() : ComponentActivity() {
                 Thread.sleep(1000)
             }
 
-            MessagingService.chatService!!.subscribe { message ->
-                if (message._data_type == "message") {
-                    for (address in messages.keys) {
-                        val publicKey =
-                            MessagingClient.get_public_key_from_onion_address(address.dropLast(6))
-                        val signature = Base64.Default.decode(message._signature)
-                        println("Signature: ${message._signature}")
-                        println(
-                            "PubKey Bytes: ${
-                                publicKey.joinToString(separator = "") { byte ->
-                                    "%02x".format(
-                                        byte
-                                    )
-                                }
-                            }"
-                        )
-                        println("Signature length: ${signature.size}")
-                        println("Public Key length: ${publicKey.size}")
 
-                        if (MessagingClient.verify_signature(message._data, signature, publicKey)) {
-                            messages[address]?.add(
-                                Message(
-                                    message._data,
-                                    isMe = false,
-                                    received = true
-                                )
+            MessagingService.chatService!!.subscribe(object: OnEvent{
+                override fun newMessage(message: ChatMessage) {
+                    if (message.dataType == "message") {
+                        for (address in messages.keys) {
+                            val publicKey =
+                                getPublicKeyFromOnionAddress(address.dropLast(6))
+                            val signature = Base64.Default.decode(message.signature)
+                            println("Signature: ${message.signature}")
+                            println(
+                                "PubKey Bytes: ${
+                                    publicKey.joinToString(separator = "") { byte ->
+                                        "%02x".format(
+                                            byte
+                                        )
+                                    }
+                                }"
                             )
+                            println("Signature length: ${signature.size}")
+                            println("Public Key length: ${publicKey.size}")
+
+                            if (verifySignature(message.data, signature, publicKey)) {
+                                messages[address]?.add(
+                                    Message(
+                                        message.data,
+                                        isMe = false,
+                                        received = true
+                                    )
+                                )
+                            }
                         }
                     }
-
                 }
-            }
+            })
 
             chatServiceAddress = MessagingService.ownOnionAddress!!
         }
@@ -159,7 +173,7 @@ class MainActivity() : ComponentActivity() {
                                 val message = Message(newMessage, isMe = true)
                                 messages[partnerAddress]?.add(message)
                                 CoroutineScope(Dispatchers.IO).launch {
-                                    MessagingService.chatService?.send_message(
+                                    MessagingService.chatService?.sendMessage(
                                         newMessage,
                                         "http://$partnerAddress"
                                     )
