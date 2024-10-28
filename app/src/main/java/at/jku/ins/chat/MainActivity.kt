@@ -81,16 +81,19 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 
 data class Message(val text: String, val isMe: Boolean, var received: Boolean = false)
 
+object ProgramState {
+    val messages = mutableStateMapOf<String, MutableList<Message>>()
+    var partnerAddress = mutableStateOf("")
+    var chatServiceAddress by mutableStateOf("")
+}
+
 class MainActivity() : ComponentActivity() {
-    private val messages = mutableStateMapOf<String, MutableList<Message>>()
-    private var partnerAddress by mutableStateOf("")
-    private var chatServiceAddress by mutableStateOf("")
 
     @OptIn(ExperimentalEncodingApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        messages[""] = mutableStateListOf()
+        ProgramState.messages[""] = mutableStateListOf()
 
         startService(Intent(this, MessagingService::class.java))
 
@@ -104,7 +107,7 @@ class MainActivity() : ComponentActivity() {
             MessagingService.chatService!!.subscribe(object: OnEvent{
                 override fun newMessage(message: ChatMessage) {
                     if (message.dataType == "message") {
-                        for (address in messages.keys) {
+                        for (address in ProgramState.messages.keys) {
                             val publicKey =
                                 getPublicKeyFromOnionAddress(address.dropLast(6))
                             val signature = Base64.Default.decode(message.signature)
@@ -122,7 +125,7 @@ class MainActivity() : ComponentActivity() {
                             println("Public Key length: ${publicKey.size}")
 
                             if (verifySignature(message.data, signature, publicKey)) {
-                                messages[address]?.add(
+                                ProgramState.messages[address]?.add(
                                     Message(
                                         message.data,
                                         isMe = false,
@@ -135,7 +138,7 @@ class MainActivity() : ComponentActivity() {
                 }
             })
 
-            chatServiceAddress = MessagingService.ownOnionAddress!!
+            ProgramState.chatServiceAddress = MessagingService.ownOnionAddress!!
         }
 
         setContent {
@@ -144,32 +147,30 @@ class MainActivity() : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background
                 ) {
                     ChatApp(
-                        messages = messages,
-                        partnerAddress = partnerAddress,
                         onAddressChange = { newAddress ->
                             if (isValidOnionUrl(newAddress)) {
-                                if (!messages.containsKey(newAddress)) {
-                                    messages[newAddress] = mutableStateListOf()
+                                if (!ProgramState.messages.containsKey(newAddress)) {
+                                    ProgramState.messages[newAddress] = mutableStateListOf()
                                 }
 //                            if (messages[partnerAddress]!!.isEmpty()) {
 //                                messages.remove(partnerAddress)
 //                            }
-                                partnerAddress = newAddress
+                                ProgramState.partnerAddress.value = newAddress
                             }
                         },
                         onSend = { newMessage ->
-                            if (isValidOnionUrl(partnerAddress)) {
+                            if (isValidOnionUrl(ProgramState.partnerAddress.value)) {
                                 val message = Message(newMessage, isMe = true)
-                                messages[partnerAddress]?.add(message)
+                                ProgramState.messages[ProgramState.partnerAddress.value]?.add(message)
                                 CoroutineScope(Dispatchers.IO).launch {
                                     MessagingService.chatService?.sendMessage(
                                         newMessage,
-                                        "http://$partnerAddress"
+                                        "http://$ProgramState.partnerAddress"
                                     )
                                     withContext(Dispatchers.Main) {
                                         message.received = true
-                                        messages[partnerAddress]?.remove(message)
-                                        messages[partnerAddress]?.add(message)
+                                        ProgramState.messages[ProgramState.partnerAddress.value]?.remove(message)
+                                        ProgramState.messages[ProgramState.partnerAddress.value]?.add(message)
                                     }
                                 }
                             } else {
@@ -179,7 +180,7 @@ class MainActivity() : ComponentActivity() {
                         onRegenerate = {
                             println("TODO: Regenerate address")
                         },
-                        chatServiceAddress = chatServiceAddress
+                        chatServiceAddress = ProgramState.chatServiceAddress
                     )
                 }
             }
@@ -190,10 +191,10 @@ class MainActivity() : ComponentActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         handleQRCodeResult(requestCode, resultCode, data) { newAddress ->
-            if (!messages.containsKey(newAddress)) {
-                messages[newAddress] = mutableStateListOf()
+            if (!ProgramState.messages.containsKey(newAddress)) {
+                ProgramState.messages[newAddress] = mutableStateListOf()
             }
-            partnerAddress = newAddress
+            ProgramState.partnerAddress.value = newAddress
         }
     }
 }
@@ -202,8 +203,6 @@ class MainActivity() : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatApp(
-    messages: SnapshotStateMap<String, MutableList<Message>>,
-    partnerAddress: String,
     onAddressChange: (String) -> Unit,
     onSend: (String) -> Unit,
     onRegenerate: () -> Unit,
@@ -221,7 +220,7 @@ fun ChatApp(
         Column {
             TopAppBar(title = {
                 Text(
-                    text = partnerAddress.ifEmpty { "Main Menu" },
+                    text = ProgramState.partnerAddress.value.ifEmpty { "Main Menu" },
                     fontSize = 18.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -260,7 +259,7 @@ fun ChatApp(
                         expanded = addressListExpanded,
                         onDismissRequest = { addressListExpanded = false }
                     ) {
-                        messages.keys.filter { it.isNotEmpty() }.forEach { key ->
+                        ProgramState.messages.keys.filter { it.isNotEmpty() }.forEach { key ->
                             DropdownMenuItem(
                                 text = { Text(key) },
                                 onClick = {
@@ -297,7 +296,7 @@ fun ChatApp(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            ChatMessages(messages = messages, address = partnerAddress)
+            ChatMessages(messages = ProgramState.messages, address = ProgramState.partnerAddress.value)
         }
     }, bottomBar = {
         ChatInput(onSend = onSend)
@@ -307,8 +306,8 @@ fun ChatApp(
         AddManuallyPopup(
             onDismiss = { showAddManuallyPopup = false },
             onAddContact = { newAddress, nickname ->
-                if (!messages.containsKey(newAddress)) {
-                    messages[newAddress] = mutableStateListOf()
+                if (!ProgramState.messages.containsKey(newAddress)) {
+                    ProgramState.messages[newAddress] = mutableStateListOf()
                 }
                 // Handle nickname if needed
                 showAddManuallyPopup = false
