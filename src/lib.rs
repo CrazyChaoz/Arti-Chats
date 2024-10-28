@@ -42,25 +42,6 @@ pub struct ChatMessage {
     pub data_type: String,
     pub data: String,
 }
-// #[uniffi::export]
-// impl ChatMessage {
-//     #[uniffi::constructor]
-//     pub fn new(signature: String, data_type: String, data: String) -> Self {
-//         ChatMessage { signature, data_type, data }
-//     }
-//
-//     pub fn get_signature(&mut self) -> String {
-//         self.signature.clone()
-//     }
-//
-//     pub fn get_data_type(&mut self) -> String {
-//         self.data_type.clone()
-//     }
-//
-//     pub fn get_data(&mut self) -> String {
-//         self.data.clone()
-//     }
-// }
 
 #[derive(uniffi::Object)]
 pub struct MessagingClient {
@@ -75,12 +56,12 @@ pub struct MessagingClient {
 impl MessagingClient {
     #[uniffi::constructor]
     pub fn new(cache_dir: &str) -> MessagingClient {
-        // #[cfg(target_os = "android")]
-        // panic::catch_unwind(|| {
-        //     Subscriber::new()
-        //         .with(tracing_android::layer("rust.arti").expect("error creating android logger"))
-        //         .init(); // this must be called only once, otherwise your app will probably crash
-        // });
+        #[cfg(target_os = "android")]
+        panic::catch_unwind(|| {
+            Subscriber::new()
+                .with(tracing_android::layer("rust.arti").expect("error creating android logger"))
+                .init(); // this must be called only once, otherwise your app will probably crash
+        });
 
         eprintln!("Starting Tor client");
 
@@ -271,6 +252,8 @@ impl MessagingClient {
         let url: Uri = Uri::from_str(recipient).expect("error parsing recipient URL");
         let host = url.host().unwrap();
 
+        info!("host parsed: {host}");
+        eprintln!("host parsed: {host}");
 
         let stream: DataStream = self.client
             .connect((host, 80))
