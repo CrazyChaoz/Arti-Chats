@@ -1,11 +1,9 @@
 package at.jku.ins.chat
 
 
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color.rgb
@@ -46,7 +44,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -62,7 +59,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat.getSystemService
@@ -77,26 +73,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import uniffi.tor_chat.ChatMessage
-import uniffi.tor_chat.MessagingClient
 import uniffi.tor_chat.OnEvent
 import uniffi.tor_chat.getPublicKeyFromOnionAddress
-import uniffi.tor_chat.uniffiCallbackInterfaceOnEvent.newMessage
 import uniffi.tor_chat.verifySignature
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 data class Message(val text: String, val isMe: Boolean, var received: Boolean = false)
 
-class Cb(): OnEvent {
-    override fun newMessage(s: ChatMessage) {
-        TODO("Not yet implemented")
-    }
-}
-
 class MainActivity() : ComponentActivity() {
     private val messages = mutableStateMapOf<String, MutableList<Message>>()
     private var partnerAddress by mutableStateOf("")
-    private var chatServiceAddress by mutableStateOf("Own Address")
+    private var chatServiceAddress by mutableStateOf("")
 
     @OptIn(ExperimentalEncodingApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -157,16 +145,17 @@ class MainActivity() : ComponentActivity() {
                 ) {
                     ChatApp(
                         messages = messages,
-                        address = partnerAddress,
+                        partnerAddress = partnerAddress,
                         onAddressChange = { newAddress ->
-                            if (!messages.containsKey(newAddress)) {
-                                messages[newAddress] = mutableStateListOf()
+                            if (isValidOnionUrl(newAddress)) {
+                                if (!messages.containsKey(newAddress)) {
+                                    messages[newAddress] = mutableStateListOf()
+                                }
+//                            if (messages[partnerAddress]!!.isEmpty()) {
+//                                messages.remove(partnerAddress)
+//                            }
+                                partnerAddress = newAddress
                             }
-                            if (messages[partnerAddress]!!.isEmpty()) {
-                                messages.remove(partnerAddress)
-                            }
-                            partnerAddress = newAddress
-
                         },
                         onSend = { newMessage ->
                             if (isValidOnionUrl(partnerAddress)) {
@@ -209,121 +198,12 @@ class MainActivity() : ComponentActivity() {
     }
 }
 
-//
-//@OptIn(ExperimentalMaterial3Api::class)
-//@Composable
-//fun ChatApp(
-//    messages: SnapshotStateMap<String, MutableList<Message>>,
-//    address: String,
-//    onAddressChange: (String) -> Unit,
-//    onSend: (String) -> Unit,
-//    onRegenerate: () -> Unit,
-//    chatServiceAddress: String
-//) {
-//    var topBarExpanded by remember { mutableStateOf(false) }
-//    var burgerMenuExpanded by remember { mutableStateOf(false) }
-//    var showQRCode by remember { mutableStateOf(false) }
-//    val context = LocalContext.current
-//
-//    Scaffold(topBar = {
-//        Column {
-//            TopAppBar(title = {
-//                Box {
-//                    Text(
-//                        text = chatServiceAddress,
-//                        fontSize = 18.sp,
-//                        maxLines = 1,
-//                        overflow = TextOverflow.Ellipsis,
-//                        modifier = Modifier.clickable { topBarExpanded = true }
-//                    )
-//                    DropdownMenu(
-//                        expanded = topBarExpanded,
-//                        onDismissRequest = { topBarExpanded = false }
-//                    ) {
-//                        DropdownMenuItem(
-//                            text = { Text("Regenerate") },
-//                            onClick = {
-//                                topBarExpanded = false
-//                                onRegenerate()
-//                            })
-//                        DropdownMenuItem(
-//                            text = { Text("Copy to Clipboard") },
-//                            onClick = {
-//                                topBarExpanded = false
-//                                val clipboard =
-//                                    getSystemService(context, ClipboardManager::class.java)
-//                                val clip = ClipData.newPlainText(
-//                                    "Chat Service Address",
-//                                    chatServiceAddress
-//                                )
-//                                clipboard?.setPrimaryClip(clip)
-//                            })
-//                        DropdownMenuItem(
-//                            text = { Text("Generate QR Code") },
-//                            onClick = {
-//                                topBarExpanded = false
-//                                showQRCode = true
-//                            })
-//                    }
-//                }
-//            }, navigationIcon = {
-//                IconButton(onClick = { burgerMenuExpanded = true }) {
-//                    Icon(
-//                        painter = painterResource(id = R.drawable.ic_burger_menu),
-//                        contentDescription = "Menu"
-//                    )
-//                    DropdownMenu(
-//                        expanded = burgerMenuExpanded,
-//                        onDismissRequest = { burgerMenuExpanded = false }) {
-//                        messages.keys.filter { it.isNotEmpty() }.forEach { key ->
-//                            DropdownMenuItem(
-//                                text = { Text(key) },
-//                                onClick = {
-//                                    burgerMenuExpanded = false
-//                                    onAddressChange(key)
-//                                }
-//                            )
-//                        }
-//                    }
-//                }
-//            })
-//            AddressRow(address = address, onAddressChange = onAddressChange)
-//        }
-//    }, content = { paddingValues ->
-//        Column(
-//            modifier = Modifier
-//                .fillMaxSize()
-//                .padding(paddingValues)
-//        ) {
-//            ChatMessages(messages = messages, address = address)
-//        }
-//    }, bottomBar = {
-//        ChatInput(onSend = onSend)
-//    })
-//
-//    if (showQRCode) {
-//        AlertDialog(
-//            onDismissRequest = { showQRCode = false },
-//            confirmButton = {
-//                TextButton(onClick = { showQRCode = false }) {
-//                    Text("Close")
-//                }
-//            },
-//            title = {
-//                Text("Your Chat Service Address")
-//            },
-//            text = {
-//                GenerateQRCode(chatServiceAddress)
-//            }
-//        )
-//    }
-//}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatApp(
     messages: SnapshotStateMap<String, MutableList<Message>>,
-    address: String,
+    partnerAddress: String,
     onAddressChange: (String) -> Unit,
     onSend: (String) -> Unit,
     onRegenerate: () -> Unit,
@@ -341,7 +221,7 @@ fun ChatApp(
         Column {
             TopAppBar(title = {
                 Text(
-                    text = address.ifEmpty { "Main Menu" },
+                    text = partnerAddress.ifEmpty { "Main Menu" },
                     fontSize = 18.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -417,7 +297,7 @@ fun ChatApp(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            ChatMessages(messages = messages, address = address)
+            ChatMessages(messages = messages, address = partnerAddress)
         }
     }, bottomBar = {
         ChatInput(onSend = onSend)
