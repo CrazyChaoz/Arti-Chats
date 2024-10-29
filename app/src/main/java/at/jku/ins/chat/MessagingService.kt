@@ -15,11 +15,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import uniffi.tor_chat.MessagingClient
 import uniffi.tor_chat.generateKey
+import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
 
 
 class MessagingService : Service() {
-
-
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // Handle start command if needed
@@ -33,7 +34,42 @@ class MessagingService : Service() {
         CoroutineScope(Dispatchers.IO).launch {
             chatService = MessagingClient(cacheDir.absolutePath)
 
-            ownOnionAddress = chatService!!.onionServiceFromSk(generateKey())+".onion"
+            val file = File(cacheDir, "serviceKey")
+
+            var storedKey: ByteArray?
+
+            if (file.exists() && !regenerate) {
+                storedKey = try {
+                    file.readBytes()
+                } catch (e: IOException) {
+                    e.printStackTrace()
+                    null
+                }
+                if (storedKey != null) {
+                    println("File exists. Using existing data.")
+
+                    ownOnionAddress = chatService!!.onionServiceFromSk(storedKey) + ".onion"
+                } else {
+                    regenerate = true
+                }
+            }
+
+            if (!file.exists() || (file.exists() && regenerate)) {
+                regenerate=false
+
+                try {
+                    FileOutputStream(file).use { fos ->
+                        storedKey = generateKey()
+                        fos.write(storedKey)
+                        ownOnionAddress = chatService!!.onionServiceFromSk(storedKey!!) + ".onion"
+                    }
+                } catch (e: IOException) {
+                    e.printStackTrace()
+                }
+                println("Creating and storing new data.")
+            }
+
+
         }
 
         if (intent != null) {
@@ -100,6 +136,8 @@ class MessagingService : Service() {
         public var ownOnionAddress: String? = null
 
         public var chatService: MessagingClient? = null
+
+        public var regenerate = false
     }
 
 }

@@ -62,7 +62,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat.getSystemService
-//import at.jku.ins.chat.ffi.MessagingClient
 import at.jku.ins.chat.ui.theme.TorChatTheme
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.integration.android.IntentIntegrator
@@ -99,7 +98,7 @@ class MainActivity() : ComponentActivity() {
 
         CoroutineScope(Dispatchers.IO).launch {
             while (MessagingService.chatService == null) {
-                println("Waiting for chat service to start")
+                println("Waiting for background service to start")
                 Thread.sleep(1000)
             }
 
@@ -111,20 +110,21 @@ class MainActivity() : ComponentActivity() {
                             val publicKey =
                                 getPublicKeyFromOnionAddress(address.dropLast(6))
                             val signature = Base64.Default.decode(message.signature)
-                            println("Signature: ${message.signature}")
-                            println(
-                                "PubKey Bytes: ${
-                                    publicKey.joinToString(separator = "") { byte ->
-                                        "%02x".format(
-                                            byte
-                                        )
-                                    }
-                                }"
-                            )
-                            println("Signature length: ${signature.size}")
-                            println("Public Key length: ${publicKey.size}")
+//                            println("Signature: ${message.signature}")
+//                            println(
+//                                "PubKey Bytes: ${
+//                                    publicKey.joinToString(separator = "") { byte ->
+//                                        "%02x".format(
+//                                            byte
+//                                        )
+//                                    }
+//                                }"
+//                            )
+//                            println("Signature length: ${signature.size}")
+//                            println("Public Key length: ${publicKey.size}")
 
                             if (verifySignature(message.data, signature, publicKey)) {
+                                println("new message from $address")
                                 ProgramState.messages[address]?.add(
                                     Message(
                                         message.data,
@@ -165,7 +165,7 @@ class MainActivity() : ComponentActivity() {
                                 CoroutineScope(Dispatchers.IO).launch {
                                     MessagingService.chatService?.sendMessage(
                                         newMessage,
-                                        "http://$ProgramState.partnerAddress"
+                                        "http://${ProgramState.partnerAddress.value}"
                                     )
                                     withContext(Dispatchers.Main) {
                                         message.received = true
