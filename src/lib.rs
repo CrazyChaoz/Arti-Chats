@@ -83,7 +83,7 @@ impl MessagingClient {
 
             let keystore_mgr = Arc::new(
                 KeyMgrBuilder::default()
-                    .default_store(Box::new(ArtiEphemeralKeystore::new(
+                    .primary_store(Box::new(ArtiEphemeralKeystore::new(
                         "in-memory-data-store".to_string(),
                     )))
                     .build()
@@ -133,7 +133,8 @@ impl MessagingClient {
             .insert(
                 encodable_key,
                 &HsIdKeypairSpecifier::new(nickname.clone().parse().unwrap()),
-                KeystoreSelector::Default,
+                KeystoreSelector::Primary,
+                true
             )
             .expect("error inserting keypair into keystore");
 

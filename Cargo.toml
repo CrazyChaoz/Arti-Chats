@@ -4,25 +4,25 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-arti-client = { version="0.22", features=["onion-service-service","onion-service-client","static","experimental-api"] }
-tor-cell = "0.22"
-tor-hsservice = "0.22"
-tor-proto = "0.22"
-tor-rtcompat = { version = "0.22", features = ["static"] }
-tor-hsrproxy = "0.22"
-tor-keymgr = "0.22"
-tor-llcrypto = "0.22"
-tor-dirmgr = { version = "0.22", features = ["static"] }
-tor-netdir = "0.22"
-tor-hscrypto = "0.22"
-tor-persist = "0.22"
+arti-client = { version= "0.23", features=["onion-service-service","onion-service-client","static","experimental-api"] }
+tor-cell = "0.23"
+tor-hsservice = "0.23"
+tor-proto = "0.23"
+tor-rtcompat = { version = "0.23", features = ["static"] }
+tor-hsrproxy = "0.23"
+tor-keymgr = { version = "0.23", features = ["ephemeral-keystore"] }
+tor-llcrypto = "0.23"
+tor-dirmgr = { version = "0.23", features = ["static"] }
+tor-netdir = "0.23"
+tor-hscrypto = "0.23"
+tor-persist = "0.23"
 tracing-subscriber = "0.3.18"
-safelog = "0.3.8"
+safelog = "0.4"
 anyhow = "1.0.86"
 base64 = "0.22.1"
 rand = "0.8"
 sha3 = "0.10"
-fs-mistrust = "0.7"
+fs-mistrust = "0.8"
 hyper = { version = "1.4", features = ["http1", "server", "client"] }
 tokio = { version="1.40" }
 http-body-util = "0.1"
