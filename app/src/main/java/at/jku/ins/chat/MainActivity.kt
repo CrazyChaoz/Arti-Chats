@@ -44,6 +44,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -77,11 +78,17 @@ import uniffi.tor_chat.getPublicKeyFromOnionAddress
 import uniffi.tor_chat.verifySignature
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.runtime.MutableState
 
-data class Message(val text: String, val isMe: Boolean, var received: Boolean = false)
+
+data class Message(val text: String, val isMe: Boolean, var received: Boolean = false, var error: Boolean = false)
 
 object ProgramState {
-    val messages = mutableStateMapOf<String, MutableList<Message>>()
+    val messages = mutableStateMapOf<String, MutableList<MutableState<Message>>>()
     var partnerAddress = mutableStateOf("")
     var chatServiceAddress by mutableStateOf("")
 }
@@ -103,33 +110,22 @@ class MainActivity() : ComponentActivity() {
             }
 
 
-            MessagingService.chatService!!.subscribe(object: OnEvent{
+            MessagingService.chatService!!.subscribe(object : OnEvent {
                 override fun newMessage(message: ChatMessage) {
                     if (message.dataType == "message") {
                         for (address in ProgramState.messages.keys) {
                             val publicKey =
                                 getPublicKeyFromOnionAddress(address.dropLast(6))
                             val signature = Base64.Default.decode(message.signature)
-//                            println("Signature: ${message.signature}")
-//                            println(
-//                                "PubKey Bytes: ${
-//                                    publicKey.joinToString(separator = "") { byte ->
-//                                        "%02x".format(
-//                                            byte
-//                                        )
-//                                    }
-//                                }"
-//                            )
-//                            println("Signature length: ${signature.size}")
-//                            println("Public Key length: ${publicKey.size}")
-
                             if (verifySignature(message.data, signature, publicKey)) {
                                 println("new message from $address")
                                 ProgramState.messages[address]?.add(
-                                    Message(
-                                        message.data,
-                                        isMe = false,
-                                        received = true
+                                    mutableStateOf(
+                                        Message(
+                                            message.data,
+                                            isMe = false,
+                                            received = true
+                                        )
                                     )
                                 )
                             }
@@ -152,25 +148,29 @@ class MainActivity() : ComponentActivity() {
                                 if (!ProgramState.messages.containsKey(newAddress)) {
                                     ProgramState.messages[newAddress] = mutableStateListOf()
                                 }
-//                            if (messages[partnerAddress]!!.isEmpty()) {
-//                                messages.remove(partnerAddress)
-//                            }
                                 ProgramState.partnerAddress.value = newAddress
                             }
                         },
                         onSend = { newMessage ->
                             if (isValidOnionUrl(ProgramState.partnerAddress.value)) {
-                                val message = Message(newMessage, isMe = true)
-                                ProgramState.messages[ProgramState.partnerAddress.value]?.add(message)
+                                val message = mutableStateOf(Message(newMessage, isMe = true))
+                                ProgramState.messages[ProgramState.partnerAddress.value]?.add(
+                                    message
+                                )
                                 CoroutineScope(Dispatchers.IO).launch {
-                                    MessagingService.chatService?.sendMessage(
+                                    val ok = MessagingService.chatService?.sendMessage(
                                         newMessage,
                                         "http://${ProgramState.partnerAddress.value}"
                                     )
-                                    withContext(Dispatchers.Main) {
-                                        message.received = true
-                                        ProgramState.messages[ProgramState.partnerAddress.value]?.remove(message)
-                                        ProgramState.messages[ProgramState.partnerAddress.value]?.add(message)
+
+                                    if (ok.equals("Message received")) {
+                                        withContext(Dispatchers.Main) {
+                                            message.value = message.value.copy(received = true)
+                                        }
+                                    }else{
+                                        withContext(Dispatchers.Main) {
+                                            message.value = message.value.copy(error = true)
+                                        }
                                     }
                                 }
                             } else {
@@ -296,7 +296,10 @@ fun ChatApp(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            ChatMessages(messages = ProgramState.messages, address = ProgramState.partnerAddress.value)
+            ChatMessages(
+                messages = ProgramState.messages,
+                address = ProgramState.partnerAddress.value
+            )
         }
     }, bottomBar = {
         ChatInput(onSend = onSend)
@@ -493,7 +496,7 @@ fun AddressRow(address: String, onAddressChange: (String) -> Unit) {
                 .background(Color.White)
         )
 
-        IconButton(onClick = {  }) {
+        IconButton(onClick = { }) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_qr_code),
                 contentDescription = "QR Code Scan"
@@ -538,9 +541,20 @@ fun handleQRCodeResult(
     }
 }
 
+
 @Composable
-fun ChatMessages(messages: SnapshotStateMap<String, MutableList<Message>>, address: String) {
+fun ChatMessages(
+    messages: MutableMap<String, MutableList<MutableState<Message>>>,
+    address: String
+) {
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(messages[address]?.size) {
+        listState.animateScrollToItem(messages[address]?.size ?: 0)
+    }
+
     LazyColumn(
+        state = listState,
         modifier = Modifier.padding(8.dp)
     ) {
         items(messages[address]!!) { message ->
@@ -550,28 +564,28 @@ fun ChatMessages(messages: SnapshotStateMap<String, MutableList<Message>>, addre
 }
 
 @Composable
-fun ChatBubble(message: Message) {
+fun ChatBubble(message: MutableState<Message>) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(8.dp)
     ) {
-        val alignment = if (message.isMe) Alignment.CenterEnd else Alignment.CenterStart
-        val backgroundColor = if (message.isMe) Color.Blue else Color.Gray
+        val backgroundColor = if (message.value.isMe) Color.Blue else Color.Gray
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = if (message.isMe) Arrangement.End else Arrangement.Start,
+            horizontalArrangement = if (message.value.isMe) Arrangement.End else Arrangement.Start,
             modifier = Modifier.fillMaxWidth()
         ) {
-            if (message.isMe) {
-                Text(
-                    text = if (message.received) "✓" else "⏳",
-                    color = Color.Blue,
+            if (message.value.isMe) {
+                Icon(
+                    imageVector = if (message.value.received) Icons.Default.Check else if (message.value.error) Icons.Default.Warning else Icons.Default.Email,
+                    contentDescription = "Received",
+                    tint = Color.Blue,
                     modifier = Modifier.padding(end = 4.dp)
                 )
             }
             Text(
-                text = message.text,
+                text = message.value.text,
                 modifier = Modifier
                     .background(backgroundColor)
                     .padding(8.dp),
