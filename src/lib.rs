@@ -2,7 +2,6 @@ use arti_client::config::TorClientConfigBuilder;
 use arti_client::TorClient;
 use base64::Engine;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
-use fs_mistrust::Mistrust;
 use futures::StreamExt;
 use futures_util::task::SpawnExt;
 use http_body_util::BodyExt;
@@ -18,12 +17,15 @@ use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use tor_cell::relaycell::msg::Connected;
 use tor_hsservice::config::OnionServiceConfigBuilder;
-use tor_hsservice::{HsIdKeypairSpecifier, OnionService};
-use tor_keymgr::{ArtiEphemeralKeystore, KeyMgrBuilder, KeystoreSelector};
 use tor_llcrypto::pk::ed25519::ExpandedKeypair;
-use tor_proto::stream::{DataStream, IncomingStreamRequest};
-use tor_rtcompat::{BlockOn, PreferredRuntime};
+use tor_proto::stream::{IncomingStreamRequest};
+use tor_rtcompat::{PreferredRuntime, ToplevelBlockOn};
+#[cfg(target_os = "android")]
 use tracing_subscriber::{fmt::Subscriber, layer::SubscriberExt, util::SubscriberInitExt};
+
+
+uniffi::setup_scaffolding!();
+
 
 #[uniffi::export(callback_interface)]
 pub trait OnEvent: Send {
@@ -40,8 +42,6 @@ pub struct ChatMessage {
 #[derive(uniffi::Object)]
 pub struct MessagingClient {
     client: TorClient<PreferredRuntime>,
-    keystore: Arc<tor_keymgr::KeyMgr>,
-    cache_dir: String,
     key_pair: Arc<Mutex<Option<[u8; 64]>>>,
     observers: Arc<Mutex<Vec<Box<dyn OnEvent>>>>,
 }
@@ -81,19 +81,8 @@ impl MessagingClient {
             eprintln!("Tor client started");
             info!("Tor client started");
 
-            let keystore_mgr = Arc::new(
-                KeyMgrBuilder::default()
-                    .primary_store(Box::new(ArtiEphemeralKeystore::new(
-                        "in-memory-data-store".to_string(),
-                    )))
-                    .build()
-                    .expect("error building key manager"),
-            );
-
             MessagingClient {
                 client,
-                keystore: keystore_mgr,
-                cache_dir: cache_dir.to_string(),
                 key_pair: Arc::new(Mutex::new(None)),
                 observers: Arc::new(Mutex::new(Vec::new())),
             }
@@ -128,50 +117,22 @@ impl MessagingClient {
 
         let encodable_key = tor_hscrypto::pk::HsIdKeypair::from(esk);
 
-        self.keystore
-            .clone()
-            .insert(
-                encodable_key,
-                &HsIdKeypairSpecifier::new(nickname.clone().parse().unwrap()),
-                KeystoreSelector::Primary,
-                true
-            )
-            .expect("error inserting keypair into keystore");
-
-        let clone_keystore = self.keystore.clone();
-        let clone_client = self.client.clone();
-
         let svc_cfg = OnionServiceConfigBuilder::default()
             .nickname(nickname.clone().parse().unwrap())
             .build()
             .unwrap();
 
-        let onion_service = OnionService::builder()
-            .config(svc_cfg)
-            .keymgr(clone_keystore.clone())
-            .state_dir(
-                tor_persist::state_dir::StateDirectory::new(
-                    format!("{}{}chat-data", self.cache_dir, std::path::MAIN_SEPARATOR),
-                    &Mistrust::new_dangerously_trust_everyone(),
-                )
-                .expect("error creating state directory"),
-            )
-            .build()
-            .expect("error building onion service");
+        let (onion_service, request_stream) = self
+            .client
+            .launch_onion_service_with_hsid(svc_cfg, encodable_key)
+            .expect("error creating onion service");
 
-        let (service, request_stream) = onion_service
-            .launch(
-                clone_client.runtime().clone(),
-                clone_client.dirmgr().clone().upcast_arc(),
-                clone_client.hs_circ_pool().clone(),
-            )
-            .unwrap();
 
-        info!("onion service created: {}", service.onion_name().unwrap());
-        eprintln!("onion service created: {}", service.onion_name().unwrap());
+        info!("onion service created: {}", onion_service.onion_address().unwrap());
+        eprintln!("onion service created: {}", onion_service.onion_address().unwrap());
 
-        info!("status: {:?}", service.status());
-        eprintln!("status: {:?}", service.status());
+        info!("status: {:?}", onion_service.status());
+        eprintln!("status: {:?}", onion_service.status());
 
         let observer_clone = self.observers.clone();
 
@@ -256,7 +217,7 @@ impl MessagingClient {
                         }
                     };
                 }
-                drop(service);
+                drop(onion_service);
                 info!("onion service dropped");
             })
             .expect("error spawning task");
@@ -348,7 +309,7 @@ impl MessagingClient {
 
 #[uniffi::export]
 pub fn generate_key() -> Vec<u8> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut sk = [0u8; 32];
     rng.fill_bytes(&mut sk);
     sk.to_vec()
@@ -437,4 +398,3 @@ mod tests {
     }
 }
 
-uniffi::setup_scaffolding!();
