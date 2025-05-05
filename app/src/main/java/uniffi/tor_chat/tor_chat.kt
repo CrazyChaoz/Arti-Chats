@@ -57,7 +57,7 @@ open class RustBuffer : Structure() {
     class ByValue: RustBuffer(), Structure.ByValue
     class ByReference: RustBuffer(), Structure.ByReference
 
-   internal fun setValue(other: RustBuffer) {
+    internal fun setValue(other: RustBuffer) {
         capacity = other.capacity
         len = other.len
         data = other.data
@@ -69,8 +69,8 @@ open class RustBuffer : Structure() {
             UniffiLib.INSTANCE.ffi_tor_chat_rustbuffer_alloc(size.toLong(), status)
         }.also {
             if(it.data == null) {
-               throw RuntimeException("RustBuffer.alloc() returned null data pointer (size=${size})")
-           }
+                throw RuntimeException("RustBuffer.alloc() returned null data pointer (size=${size})")
+            }
         }
 
         internal fun create(capacity: ULong, len: ULong, data: Pointer?): RustBuffer.ByValue {
@@ -199,11 +199,11 @@ public interface FfiConverter<KotlinType, FfiType> {
     fun liftFromRustBuffer(rbuf: RustBuffer.ByValue): KotlinType {
         val byteBuf = rbuf.asByteBuffer()!!
         try {
-           val item = read(byteBuf)
-           if (byteBuf.hasRemaining()) {
-               throw RuntimeException("junk remaining in buffer after lifting, something is very wrong!!")
-           }
-           return item
+            val item = read(byteBuf)
+            if (byteBuf.hasRemaining()) {
+                throw RuntimeException("junk remaining in buffer after lifting, something is very wrong!!")
+            }
+            return item
         } finally {
             RustBuffer.free(rbuf)
         }
@@ -411,7 +411,7 @@ internal open class UniffiForeignFuture(
         `free`: UniffiForeignFutureFree? = null,
     ): UniffiForeignFuture(`handle`,`free`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFuture) {
+    internal fun uniffiSetValue(other: UniffiForeignFuture) {
         `handle` = other.`handle`
         `free` = other.`free`
     }
@@ -427,7 +427,7 @@ internal open class UniffiForeignFutureStructU8(
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
     ): UniffiForeignFutureStructU8(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructU8) {
+    internal fun uniffiSetValue(other: UniffiForeignFutureStructU8) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
@@ -446,7 +446,7 @@ internal open class UniffiForeignFutureStructI8(
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
     ): UniffiForeignFutureStructI8(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructI8) {
+    internal fun uniffiSetValue(other: UniffiForeignFutureStructI8) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
@@ -465,7 +465,7 @@ internal open class UniffiForeignFutureStructU16(
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
     ): UniffiForeignFutureStructU16(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructU16) {
+    internal fun uniffiSetValue(other: UniffiForeignFutureStructU16) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
@@ -484,7 +484,7 @@ internal open class UniffiForeignFutureStructI16(
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
     ): UniffiForeignFutureStructI16(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructI16) {
+    internal fun uniffiSetValue(other: UniffiForeignFutureStructI16) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
@@ -503,7 +503,7 @@ internal open class UniffiForeignFutureStructU32(
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
     ): UniffiForeignFutureStructU32(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructU32) {
+    internal fun uniffiSetValue(other: UniffiForeignFutureStructU32) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
@@ -522,7 +522,7 @@ internal open class UniffiForeignFutureStructI32(
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
     ): UniffiForeignFutureStructI32(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructI32) {
+    internal fun uniffiSetValue(other: UniffiForeignFutureStructI32) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
@@ -541,7 +541,7 @@ internal open class UniffiForeignFutureStructU64(
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
     ): UniffiForeignFutureStructU64(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructU64) {
+    internal fun uniffiSetValue(other: UniffiForeignFutureStructU64) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
@@ -560,7 +560,7 @@ internal open class UniffiForeignFutureStructI64(
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
     ): UniffiForeignFutureStructI64(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructI64) {
+    internal fun uniffiSetValue(other: UniffiForeignFutureStructI64) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
@@ -579,7 +579,7 @@ internal open class UniffiForeignFutureStructF32(
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
     ): UniffiForeignFutureStructF32(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructF32) {
+    internal fun uniffiSetValue(other: UniffiForeignFutureStructF32) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
@@ -598,7 +598,7 @@ internal open class UniffiForeignFutureStructF64(
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
     ): UniffiForeignFutureStructF64(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructF64) {
+    internal fun uniffiSetValue(other: UniffiForeignFutureStructF64) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
@@ -617,7 +617,7 @@ internal open class UniffiForeignFutureStructPointer(
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
     ): UniffiForeignFutureStructPointer(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructPointer) {
+    internal fun uniffiSetValue(other: UniffiForeignFutureStructPointer) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
@@ -636,7 +636,7 @@ internal open class UniffiForeignFutureStructRustBuffer(
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
     ): UniffiForeignFutureStructRustBuffer(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructRustBuffer) {
+    internal fun uniffiSetValue(other: UniffiForeignFutureStructRustBuffer) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
@@ -653,7 +653,7 @@ internal open class UniffiForeignFutureStructVoid(
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
     ): UniffiForeignFutureStructVoid(`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructVoid) {
+    internal fun uniffiSetValue(other: UniffiForeignFutureStructVoid) {
         `callStatus` = other.`callStatus`
     }
 
@@ -674,7 +674,7 @@ internal open class UniffiVTableCallbackInterfaceOnEvent(
         `uniffiFree`: UniffiCallbackInterfaceFree? = null,
     ): UniffiVTableCallbackInterfaceOnEvent(`newMessage`,`uniffiFree`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiVTableCallbackInterfaceOnEvent) {
+    internal fun uniffiSetValue(other: UniffiVTableCallbackInterfaceOnEvent) {
         `newMessage` = other.`newMessage`
         `uniffiFree` = other.`uniffiFree`
     }
@@ -762,164 +762,21 @@ internal open class UniffiVTableCallbackInterfaceOnEvent(
 
 
 
-// A JNA Library to expose the extern-C FFI definitions.
-// This is an implementation detail which will be called internally by the public API.
-
-internal interface UniffiLib : Library {
-    companion object {
-        internal val INSTANCE: UniffiLib by lazy {
-            loadIndirect<UniffiLib>(componentName = "tor_chat")
-            .also { lib: UniffiLib ->
-                uniffiCheckContractApiVersion(lib)
-                uniffiCheckApiChecksums(lib)
-                uniffiCallbackInterfaceOnEvent.register(lib)
-                }
-        }
-        
-        // The Cleaner for the whole library
-        internal val CLEANER: UniffiCleaner by lazy {
-            UniffiCleaner.create()
-        }
-    }
-
-    fun uniffi_tor_chat_fn_clone_messagingclient(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Pointer
-    fun uniffi_tor_chat_fn_free_messagingclient(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    fun uniffi_tor_chat_fn_constructor_messagingclient_new(`cacheDir`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Pointer
-    fun uniffi_tor_chat_fn_method_messagingclient_onion_service_from_esk(`ptr`: Pointer,`expandedSecretKey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_tor_chat_fn_method_messagingclient_onion_service_from_sk(`ptr`: Pointer,`secretKey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_tor_chat_fn_method_messagingclient_send_message(`ptr`: Pointer,`message`: RustBuffer.ByValue,`recipient`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_tor_chat_fn_method_messagingclient_send_message_inner(`ptr`: Pointer,`message`: RustBuffer.ByValue,`recipient`: RustBuffer.ByValue,
-    ): Long
-    fun uniffi_tor_chat_fn_method_messagingclient_subscribe(`ptr`: Pointer,`cb`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    fun uniffi_tor_chat_fn_init_callback_vtable_onevent(`vtable`: UniffiVTableCallbackInterfaceOnEvent,
-    ): Unit
-    fun uniffi_tor_chat_fn_func_generate_key(uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_tor_chat_fn_func_get_onion_address(`publicKey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_tor_chat_fn_func_get_public_key_from_onion_address(`onionAddress`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_tor_chat_fn_func_verify_signature(`data`: RustBuffer.ByValue,`signature`: RustBuffer.ByValue,`publicKey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Byte
-    fun ffi_tor_chat_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun ffi_tor_chat_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun ffi_tor_chat_rustbuffer_free(`buf`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    fun ffi_tor_chat_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun ffi_tor_chat_rust_future_poll_u8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_cancel_u8(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_free_u8(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_complete_u8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Byte
-    fun ffi_tor_chat_rust_future_poll_i8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_cancel_i8(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_free_i8(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_complete_i8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Byte
-    fun ffi_tor_chat_rust_future_poll_u16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_cancel_u16(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_free_u16(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_complete_u16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Short
-    fun ffi_tor_chat_rust_future_poll_i16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_cancel_i16(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_free_i16(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_complete_i16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Short
-    fun ffi_tor_chat_rust_future_poll_u32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_cancel_u32(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_free_u32(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_complete_u32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Int
-    fun ffi_tor_chat_rust_future_poll_i32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_cancel_i32(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_free_i32(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_complete_i32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Int
-    fun ffi_tor_chat_rust_future_poll_u64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_cancel_u64(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_free_u64(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_complete_u64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Long
-    fun ffi_tor_chat_rust_future_poll_i64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_cancel_i64(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_free_i64(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_complete_i64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Long
-    fun ffi_tor_chat_rust_future_poll_f32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_cancel_f32(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_free_f32(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_complete_f32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Float
-    fun ffi_tor_chat_rust_future_poll_f64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_cancel_f64(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_free_f64(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_complete_f64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Double
-    fun ffi_tor_chat_rust_future_poll_pointer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_cancel_pointer(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_free_pointer(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_complete_pointer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Pointer
-    fun ffi_tor_chat_rust_future_poll_rust_buffer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_cancel_rust_buffer(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_free_rust_buffer(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_complete_rust_buffer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun ffi_tor_chat_rust_future_poll_void(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_cancel_void(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_free_void(`handle`: Long,
-    ): Unit
-    fun ffi_tor_chat_rust_future_complete_void(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
+// For large crates we prevent `MethodTooLargeException` (see #2340)
+// N.B. the name of the extension is very misleading, since it is
+// rather `InterfaceTooLargeException`, caused by too many methods
+// in the interface for large crates.
+//
+// By splitting the otherwise huge interface into two parts
+// * UniffiLib
+// * IntegrityCheckingUniffiLib (this)
+// we allow for ~2x as many methods in the UniffiLib interface.
+//
+// The `ffi_uniffi_contract_version` method and all checksum methods are put
+// into `IntegrityCheckingUniffiLib` and these methods are called only once,
+// when the library is loaded.
+internal interface IntegrityCheckingUniffiLib : Library {
+    // Integrity check functions only
     fun uniffi_tor_chat_checksum_func_generate_key(
     ): Short
     fun uniffi_tor_chat_checksum_func_get_onion_address(
@@ -944,21 +801,206 @@ internal interface UniffiLib : Library {
     ): Short
     fun ffi_tor_chat_uniffi_contract_version(
     ): Int
-    
+
 }
 
-private fun uniffiCheckContractApiVersion(lib: UniffiLib) {
+// A JNA Library to expose the extern-C FFI definitions.
+// This is an implementation detail which will be called internally by the public API.
+internal interface UniffiLib : Library {
+    companion object {
+        internal val INSTANCE: UniffiLib by lazy {
+            val componentName = "tor_chat"
+            // For large crates we prevent `MethodTooLargeException` (see #2340)
+            // N.B. the name of the extension is very misleading, since it is
+            // rather `InterfaceTooLargeException`, caused by too many methods
+            // in the interface for large crates.
+            //
+            // By splitting the otherwise huge interface into two parts
+            // * UniffiLib (this)
+            // * IntegrityCheckingUniffiLib
+            // And all checksum methods are put into `IntegrityCheckingUniffiLib`
+            // we allow for ~2x as many methods in the UniffiLib interface.
+            //
+            // Thus we first load the library with `loadIndirect` as `IntegrityCheckingUniffiLib`
+            // so that we can (optionally!) call `uniffiCheckApiChecksums`...
+            loadIndirect<IntegrityCheckingUniffiLib>(componentName)
+                .also { lib: IntegrityCheckingUniffiLib ->
+                    uniffiCheckContractApiVersion(lib)
+                    uniffiCheckApiChecksums(lib)
+                }
+            // ... and then we load the library as `UniffiLib`
+            // N.B. we cannot use `loadIndirect` once and then try to cast it to `UniffiLib`
+            // => results in `java.lang.ClassCastException: com.sun.proxy.$Proxy cannot be cast to ...`
+            // error. So we must call `loadIndirect` twice. For crates large enough
+            // to trigger this issue, the performance impact is negligible, running on
+            // a macOS M1 machine the `loadIndirect` call takes ~50ms.
+            val lib = loadIndirect<UniffiLib>(componentName)
+            // No need to check the contract version and checksums, since
+            // we already did that with `IntegrityCheckingUniffiLib` above.
+            uniffiCallbackInterfaceOnEvent.register(lib)
+            // Loading of library with integrity check done.
+            lib
+        }
+
+        // The Cleaner for the whole library
+        internal val CLEANER: UniffiCleaner by lazy {
+            UniffiCleaner.create()
+        }
+    }
+
+    // FFI functions
+    fun uniffi_tor_chat_fn_clone_messagingclient(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
+    ): Pointer
+    fun uniffi_tor_chat_fn_free_messagingclient(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus,
+    ): Unit
+    fun uniffi_tor_chat_fn_constructor_messagingclient_new(`cacheDir`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+    ): Pointer
+    fun uniffi_tor_chat_fn_method_messagingclient_onion_service_from_esk(`ptr`: Pointer,`expandedSecretKey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+    ): RustBuffer.ByValue
+    fun uniffi_tor_chat_fn_method_messagingclient_onion_service_from_sk(`ptr`: Pointer,`secretKey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+    ): RustBuffer.ByValue
+    fun uniffi_tor_chat_fn_method_messagingclient_send_message(`ptr`: Pointer,`message`: RustBuffer.ByValue,`recipient`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+    ): RustBuffer.ByValue
+    fun uniffi_tor_chat_fn_method_messagingclient_send_message_inner(`ptr`: Pointer,`message`: RustBuffer.ByValue,`recipient`: RustBuffer.ByValue,
+    ): Long
+    fun uniffi_tor_chat_fn_method_messagingclient_subscribe(`ptr`: Pointer,`cb`: Long,uniffi_out_err: UniffiRustCallStatus,
+    ): Unit
+    fun uniffi_tor_chat_fn_init_callback_vtable_onevent(`vtable`: UniffiVTableCallbackInterfaceOnEvent,
+    ): Unit
+    fun uniffi_tor_chat_fn_func_generate_key(uniffi_out_err: UniffiRustCallStatus,
+    ): RustBuffer.ByValue
+    fun uniffi_tor_chat_fn_func_get_onion_address(`publicKey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+    ): RustBuffer.ByValue
+    fun uniffi_tor_chat_fn_func_get_public_key_from_onion_address(`onionAddress`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+    ): RustBuffer.ByValue
+    fun uniffi_tor_chat_fn_func_verify_signature(`data`: RustBuffer.ByValue,`signature`: RustBuffer.ByValue,`publicKey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+    ): Byte
+    fun ffi_tor_chat_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus,
+    ): RustBuffer.ByValue
+    fun ffi_tor_chat_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus,
+    ): RustBuffer.ByValue
+    fun ffi_tor_chat_rustbuffer_free(`buf`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+    ): Unit
+    fun ffi_tor_chat_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Long,uniffi_out_err: UniffiRustCallStatus,
+    ): RustBuffer.ByValue
+    fun ffi_tor_chat_rust_future_poll_u8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_cancel_u8(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_free_u8(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_complete_u8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+    ): Byte
+    fun ffi_tor_chat_rust_future_poll_i8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_cancel_i8(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_free_i8(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_complete_i8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+    ): Byte
+    fun ffi_tor_chat_rust_future_poll_u16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_cancel_u16(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_free_u16(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_complete_u16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+    ): Short
+    fun ffi_tor_chat_rust_future_poll_i16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_cancel_i16(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_free_i16(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_complete_i16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+    ): Short
+    fun ffi_tor_chat_rust_future_poll_u32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_cancel_u32(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_free_u32(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_complete_u32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+    ): Int
+    fun ffi_tor_chat_rust_future_poll_i32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_cancel_i32(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_free_i32(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_complete_i32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+    ): Int
+    fun ffi_tor_chat_rust_future_poll_u64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_cancel_u64(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_free_u64(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_complete_u64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+    ): Long
+    fun ffi_tor_chat_rust_future_poll_i64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_cancel_i64(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_free_i64(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_complete_i64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+    ): Long
+    fun ffi_tor_chat_rust_future_poll_f32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_cancel_f32(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_free_f32(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_complete_f32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+    ): Float
+    fun ffi_tor_chat_rust_future_poll_f64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_cancel_f64(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_free_f64(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_complete_f64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+    ): Double
+    fun ffi_tor_chat_rust_future_poll_pointer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_cancel_pointer(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_free_pointer(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_complete_pointer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+    ): Pointer
+    fun ffi_tor_chat_rust_future_poll_rust_buffer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_cancel_rust_buffer(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_free_rust_buffer(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_complete_rust_buffer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+    ): RustBuffer.ByValue
+    fun ffi_tor_chat_rust_future_poll_void(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_cancel_void(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_free_void(`handle`: Long,
+    ): Unit
+    fun ffi_tor_chat_rust_future_complete_void(`handle`: Long,uniffi_out_err: UniffiRustCallStatus,
+    ): Unit
+
+}
+
+private fun uniffiCheckContractApiVersion(lib: IntegrityCheckingUniffiLib) {
     // Get the bindings contract version from our ComponentInterface
-    val bindings_contract_version = 26
+    val bindings_contract_version = 29
     // Get the scaffolding contract version by calling the into the dylib
     val scaffolding_contract_version = lib.ffi_tor_chat_uniffi_contract_version()
     if (bindings_contract_version != scaffolding_contract_version) {
         throw RuntimeException("UniFFI contract version mismatch: try cleaning and rebuilding your project")
     }
 }
-
 @Suppress("UNUSED_PARAMETER")
-private fun uniffiCheckApiChecksums(lib: UniffiLib) {
+private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_tor_chat_checksum_func_generate_key() != 55340.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -992,6 +1034,13 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_tor_chat_checksum_method_onevent_new_message() != 55188.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+}
+
+/**
+ * @suppress
+ */
+public fun uniffiEnsureInitialized() {
+    UniffiLib.INSTANCE
 }
 
 // Async support
@@ -1051,8 +1100,33 @@ interface Disposable {
     fun destroy()
     companion object {
         fun destroy(vararg args: Any?) {
-            args.filterIsInstance<Disposable>()
-                .forEach(Disposable::destroy)
+            for (arg in args) {
+                when (arg) {
+                    is Disposable -> arg.destroy()
+                    is ArrayList<*> -> {
+                        for (idx in arg.indices) {
+                            val element = arg[idx]
+                            if (element is Disposable) {
+                                element.destroy()
+                            }
+                        }
+                    }
+                    is Map<*, *> -> {
+                        for (element in arg.values) {
+                            if (element is Disposable) {
+                                element.destroy()
+                            }
+                        }
+                    }
+                    is Iterable<*> -> {
+                        for (element in arg) {
+                            if (element is Disposable) {
+                                element.destroy()
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -1072,7 +1146,7 @@ inline fun <T : Disposable?, R> T.use(block: (T) -> R) =
         }
     }
 
-/** 
+/**
  * Used to instantiate an interface without an actual pointer, for fakes in tests, mostly.
  *
  * @suppress
@@ -1311,6 +1385,7 @@ private class UniffiJnaCleanable(
     override fun clean() = cleanable.clean()
 }
 
+
 // We decide at uniffi binding generation time whether we were
 // using Android or not.
 // There are further runtime checks to chose the correct implementation
@@ -1341,21 +1416,22 @@ private class JavaLangRefCleanable(
     override fun clean() = cleanable.clean()
 }
 public interface MessagingClientInterface {
-    
+
     fun `onionServiceFromEsk`(`expandedSecretKey`: kotlin.ByteArray): kotlin.String
-    
+
     fun `onionServiceFromSk`(`secretKey`: kotlin.ByteArray): kotlin.String
-    
+
     fun `sendMessage`(`message`: kotlin.String, `recipient`: kotlin.String): kotlin.String
-    
+
     suspend fun `sendMessageInner`(`message`: kotlin.String, `recipient`: kotlin.String): kotlin.String
-    
+
     fun `subscribe`(`cb`: OnEvent)
-    
+
     companion object
 }
 
-open class MessagingClient: Disposable, AutoCloseable, MessagingClientInterface {
+open class MessagingClient: Disposable, AutoCloseable, MessagingClientInterface
+{
 
     constructor(pointer: Pointer) {
         this.pointer = pointer
@@ -1373,12 +1449,12 @@ open class MessagingClient: Disposable, AutoCloseable, MessagingClientInterface 
         this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(pointer))
     }
     constructor(`cacheDir`: kotlin.String) :
-        this(
-    uniffiRustCall() { _status ->
-    UniffiLib.INSTANCE.uniffi_tor_chat_fn_constructor_messagingclient_new(
-        FfiConverterString.lower(`cacheDir`),_status)
-}
-    )
+            this(
+                uniffiRustCall() { _status ->
+                    UniffiLib.INSTANCE.uniffi_tor_chat_fn_constructor_messagingclient_new(
+                        FfiConverterString.lower(`cacheDir`),_status)
+                }
+            )
 
     protected val pointer: Pointer?
     protected val cleanable: UniffiCleaner.Cleanable
@@ -1444,78 +1520,78 @@ open class MessagingClient: Disposable, AutoCloseable, MessagingClientInterface 
     }
 
     override fun `onionServiceFromEsk`(`expandedSecretKey`: kotlin.ByteArray): kotlin.String {
-            return FfiConverterString.lift(
-    callWithPointer {
-    uniffiRustCall() { _status ->
-    UniffiLib.INSTANCE.uniffi_tor_chat_fn_method_messagingclient_onion_service_from_esk(
-        it, FfiConverterByteArray.lower(`expandedSecretKey`),_status)
-}
+        return FfiConverterString.lift(
+            callWithPointer {
+                uniffiRustCall() { _status ->
+                    UniffiLib.INSTANCE.uniffi_tor_chat_fn_method_messagingclient_onion_service_from_esk(
+                        it, FfiConverterByteArray.lower(`expandedSecretKey`),_status)
+                }
+            }
+        )
     }
-    )
-    }
-    
+
 
     override fun `onionServiceFromSk`(`secretKey`: kotlin.ByteArray): kotlin.String {
-            return FfiConverterString.lift(
-    callWithPointer {
-    uniffiRustCall() { _status ->
-    UniffiLib.INSTANCE.uniffi_tor_chat_fn_method_messagingclient_onion_service_from_sk(
-        it, FfiConverterByteArray.lower(`secretKey`),_status)
-}
+        return FfiConverterString.lift(
+            callWithPointer {
+                uniffiRustCall() { _status ->
+                    UniffiLib.INSTANCE.uniffi_tor_chat_fn_method_messagingclient_onion_service_from_sk(
+                        it, FfiConverterByteArray.lower(`secretKey`),_status)
+                }
+            }
+        )
     }
-    )
-    }
-    
+
 
     override fun `sendMessage`(`message`: kotlin.String, `recipient`: kotlin.String): kotlin.String {
-            return FfiConverterString.lift(
-    callWithPointer {
-    uniffiRustCall() { _status ->
-    UniffiLib.INSTANCE.uniffi_tor_chat_fn_method_messagingclient_send_message(
-        it, FfiConverterString.lower(`message`),FfiConverterString.lower(`recipient`),_status)
-}
+        return FfiConverterString.lift(
+            callWithPointer {
+                uniffiRustCall() { _status ->
+                    UniffiLib.INSTANCE.uniffi_tor_chat_fn_method_messagingclient_send_message(
+                        it, FfiConverterString.lower(`message`),FfiConverterString.lower(`recipient`),_status)
+                }
+            }
+        )
     }
-    )
-    }
-    
 
-    
+
+
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `sendMessageInner`(`message`: kotlin.String, `recipient`: kotlin.String) : kotlin.String {
         return uniffiRustCallAsync(
-        callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_tor_chat_fn_method_messagingclient_send_message_inner(
-                thisPtr,
-                FfiConverterString.lower(`message`),FfiConverterString.lower(`recipient`),
-            )
-        },
-        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_tor_chat_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.INSTANCE.ffi_tor_chat_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.INSTANCE.ffi_tor_chat_rust_future_free_rust_buffer(future) },
-        // lift function
-        { FfiConverterString.lift(it) },
-        // Error FFI converter
-        UniffiNullRustCallStatusErrorHandler,
-    )
+            callWithPointer { thisPtr ->
+                UniffiLib.INSTANCE.uniffi_tor_chat_fn_method_messagingclient_send_message_inner(
+                    thisPtr,
+                    FfiConverterString.lower(`message`),FfiConverterString.lower(`recipient`),
+                )
+            },
+            { future, callback, continuation -> UniffiLib.INSTANCE.ffi_tor_chat_rust_future_poll_rust_buffer(future, callback, continuation) },
+            { future, continuation -> UniffiLib.INSTANCE.ffi_tor_chat_rust_future_complete_rust_buffer(future, continuation) },
+            { future -> UniffiLib.INSTANCE.ffi_tor_chat_rust_future_free_rust_buffer(future) },
+            // lift function
+            { FfiConverterString.lift(it) },
+            // Error FFI converter
+            UniffiNullRustCallStatusErrorHandler,
+        )
     }
 
     override fun `subscribe`(`cb`: OnEvent)
-        = 
-    callWithPointer {
-    uniffiRustCall() { _status ->
-    UniffiLib.INSTANCE.uniffi_tor_chat_fn_method_messagingclient_subscribe(
-        it, FfiConverterTypeOnEvent.lower(`cb`),_status)
-}
-    }
-    
-    
+            =
+        callWithPointer {
+            uniffiRustCall() { _status ->
+                UniffiLib.INSTANCE.uniffi_tor_chat_fn_method_messagingclient_subscribe(
+                    it, FfiConverterTypeOnEvent.lower(`cb`),_status)
+            }
+        }
 
-    
 
-    
-    
+
+
+
+
+
     companion object
-    
+
 }
 
 /**
@@ -1549,11 +1625,11 @@ public object FfiConverterTypeMessagingClient: FfiConverter<MessagingClient, Poi
 
 
 data class ChatMessage (
-    var `signature`: kotlin.String, 
-    var `dataType`: kotlin.String, 
+    var `signature`: kotlin.String,
+    var `dataType`: kotlin.String,
     var `data`: kotlin.String
 ) {
-    
+
     companion object
 }
 
@@ -1571,14 +1647,14 @@ public object FfiConverterTypeChatMessage: FfiConverterRustBuffer<ChatMessage> {
 
     override fun allocationSize(value: ChatMessage) = (
             FfiConverterString.allocationSize(value.`signature`) +
-            FfiConverterString.allocationSize(value.`dataType`) +
-            FfiConverterString.allocationSize(value.`data`)
-    )
+                    FfiConverterString.allocationSize(value.`dataType`) +
+                    FfiConverterString.allocationSize(value.`data`)
+            )
 
     override fun write(value: ChatMessage, buf: ByteBuffer) {
-            FfiConverterString.write(value.`signature`, buf)
-            FfiConverterString.write(value.`dataType`, buf)
-            FfiConverterString.write(value.`data`, buf)
+        FfiConverterString.write(value.`signature`, buf)
+        FfiConverterString.write(value.`dataType`, buf)
+        FfiConverterString.write(value.`data`, buf)
     }
 }
 
@@ -1587,9 +1663,9 @@ public object FfiConverterTypeChatMessage: FfiConverterRustBuffer<ChatMessage> {
 
 
 public interface OnEvent {
-    
+
     fun `newMessage`(`s`: ChatMessage)
-    
+
     companion object
 }
 
@@ -1672,41 +1748,41 @@ public object FfiConverterTypeOnEvent: FfiConverterCallbackInterface<OnEvent>()
 
 
 
- fun `generateKey`(): kotlin.ByteArray {
-            return FfiConverterByteArray.lift(
-    uniffiRustCall() { _status ->
-    UniffiLib.INSTANCE.uniffi_tor_chat_fn_func_generate_key(
-        _status)
-}
+fun `generateKey`(): kotlin.ByteArray {
+    return FfiConverterByteArray.lift(
+        uniffiRustCall() { _status ->
+            UniffiLib.INSTANCE.uniffi_tor_chat_fn_func_generate_key(
+                _status)
+        }
     )
-    }
-    
- fun `getOnionAddress`(`publicKey`: kotlin.ByteArray): kotlin.String {
-            return FfiConverterString.lift(
-    uniffiRustCall() { _status ->
-    UniffiLib.INSTANCE.uniffi_tor_chat_fn_func_get_onion_address(
-        FfiConverterByteArray.lower(`publicKey`),_status)
 }
+
+fun `getOnionAddress`(`publicKey`: kotlin.ByteArray): kotlin.String {
+    return FfiConverterString.lift(
+        uniffiRustCall() { _status ->
+            UniffiLib.INSTANCE.uniffi_tor_chat_fn_func_get_onion_address(
+                FfiConverterByteArray.lower(`publicKey`),_status)
+        }
     )
-    }
-    
- fun `getPublicKeyFromOnionAddress`(`onionAddress`: kotlin.String): kotlin.ByteArray {
-            return FfiConverterByteArray.lift(
-    uniffiRustCall() { _status ->
-    UniffiLib.INSTANCE.uniffi_tor_chat_fn_func_get_public_key_from_onion_address(
-        FfiConverterString.lower(`onionAddress`),_status)
 }
+
+fun `getPublicKeyFromOnionAddress`(`onionAddress`: kotlin.String): kotlin.ByteArray {
+    return FfiConverterByteArray.lift(
+        uniffiRustCall() { _status ->
+            UniffiLib.INSTANCE.uniffi_tor_chat_fn_func_get_public_key_from_onion_address(
+                FfiConverterString.lower(`onionAddress`),_status)
+        }
     )
-    }
-    
- fun `verifySignature`(`data`: kotlin.String, `signature`: kotlin.ByteArray, `publicKey`: kotlin.ByteArray): kotlin.Boolean {
-            return FfiConverterBoolean.lift(
-    uniffiRustCall() { _status ->
-    UniffiLib.INSTANCE.uniffi_tor_chat_fn_func_verify_signature(
-        FfiConverterString.lower(`data`),FfiConverterByteArray.lower(`signature`),FfiConverterByteArray.lower(`publicKey`),_status)
 }
+
+fun `verifySignature`(`data`: kotlin.String, `signature`: kotlin.ByteArray, `publicKey`: kotlin.ByteArray): kotlin.Boolean {
+    return FfiConverterBoolean.lift(
+        uniffiRustCall() { _status ->
+            UniffiLib.INSTANCE.uniffi_tor_chat_fn_func_verify_signature(
+                FfiConverterString.lower(`data`),FfiConverterByteArray.lower(`signature`),FfiConverterByteArray.lower(`publicKey`),_status)
+        }
     )
-    }
+}
     
 
 
