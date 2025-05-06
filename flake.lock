@@ -27,11 +27,11 @@
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
-        "lastModified": 1746449075,
-        "narHash": "sha256-eXFDV4P+pPioxqKz+JbY0uSkDHGCh26haqNXedMJW4M=",
+        "lastModified": 1746537141,
+        "narHash": "sha256-ci8Dxe+ah7zebDMmx6qgy4svlRi3twK1uSSh5x3t+YE=",
         "ref": "refs/heads/master",
-        "rev": "88db0214738f0699bad1316d7f98dbd629e3675e",
-        "revCount": 27,
+        "rev": "94ca87c3cfd3f55830a9912b11dba739cd9c1a70",
+        "revCount": 28,
         "type": "git",
         "url": "https://git.ins.jku.at/proj/digidow/tor-chat-rust-library.git"
       },
