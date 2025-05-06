@@ -6,10 +6,7 @@
     flake-utils.url = "github:numtide/flake-utils";
     android.url = "github:tadfisher/android-nixpkgs";
     nix-filter.url = github:numtide/nix-filter;
-    gradle-dot-nix ={
-        type = "path";
-        path = "/home/kemp/ins/development/gradle-dot-nix";
-    };
+    gradle-dot-nix.url = "github:CrazyChaoz/gradle-dot-nix";
     backend-rust = {
       type = "git";
       url = "https://git.ins.jku.at/proj/digidow/tor-chat-rust-library.git";

@@ -136,14 +136,17 @@
         "nixpkgs": "nixpkgs_4"
       },
       "locked": {
-        "lastModified": 1746524353,
-        "narHash": "sha256-rdldnzss9aoD+y9uqo2SCDHVOc6B8/Q3kfj9tZUR89w=",
-        "path": "/home/kemp/ins/development/gradle-dot-nix",
-        "type": "path"
+        "lastModified": 1730301489,
+        "narHash": "sha256-59k5AuQ+qn3El6AseUmtN0MMadBVzNj0Lmh81MdKavM=",
+        "owner": "CrazyChaoz",
+        "repo": "gradle-dot-nix",
+        "rev": "7c7aef4e7cf60c4fd1922d08b3e710186b741fa8",
+        "type": "github"
       },
       "original": {
-        "path": "/home/kemp/ins/development/gradle-dot-nix",
-        "type": "path"
+        "owner": "CrazyChaoz",
+        "repo": "gradle-dot-nix",
+        "type": "github"
       }
     },
     "nix-filter": {
