@@ -2,7 +2,7 @@ use arti_client::config::TorClientConfigBuilder;
 use arti_client::TorClient;
 use base64::Engine;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
 use futures_util::task::SpawnExt;
 use http_body_util::BodyExt;
 use hyper::server::conn::http1;
@@ -13,19 +13,18 @@ use log::{error, info};
 use rand::RngCore;
 use sha3::{Digest, Sha3_256};
 use std::panic;
+use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use tor_cell::relaycell::msg::Connected;
 use tor_hsservice::config::OnionServiceConfigBuilder;
 use tor_llcrypto::pk::ed25519::ExpandedKeypair;
-use tor_proto::stream::{IncomingStreamRequest};
+use tor_proto::stream::IncomingStreamRequest;
 use tor_rtcompat::{PreferredRuntime, ToplevelBlockOn};
 #[cfg(target_os = "android")]
 use tracing_subscriber::{fmt::Subscriber, layer::SubscriberExt, util::SubscriberInitExt};
 
-
 uniffi::setup_scaffolding!();
-
 
 #[uniffi::export(callback_interface)]
 pub trait OnEvent: Send {
@@ -122,10 +121,23 @@ impl MessagingClient {
             .build()
             .unwrap();
 
-        let (onion_service, request_stream) = self
+        let (onion_service, request_stream): (
+            _,
+            Pin<Box<dyn Stream<Item = tor_hsservice::RendRequest> + Send>>,
+        ) = match self
             .client
-            .launch_onion_service_with_hsid(svc_cfg, encodable_key)
-            .expect("error creating onion service");
+            .launch_onion_service_with_hsid(svc_cfg.clone(), encodable_key)
+        {
+            Ok((service, stream)) => (service, Box::pin(stream)),
+            Err(_) => {
+                // This key exists; reuse it
+                let (service, stream) = self
+                    .client
+                    .launch_onion_service(svc_cfg)
+                    .expect("error creating onion service");
+                (service, Box::pin(stream))
+            }
+        };
 
 
         info!("onion service created: {}", onion_service.onion_address().unwrap());
@@ -397,4 +409,3 @@ mod tests {
         );
     }
 }
-
