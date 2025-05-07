@@ -187,10 +187,10 @@ impl MessagingClient {
                                     io,
                                     service_fn(|request| async {
                                         info!("request gotten");
-                                        let path = request.uri().path();
+                                        let path = request.uri().path().to_string();
                                         let binding = request.headers().clone();
                                         let signature = binding.get("X-Signature-Ed25519");
-                                        if path == "/message" {
+                                        if path == "/message" || path == "/data" {
                                             let message =
                                                 request.collect().await.unwrap().to_bytes();
                                             let message = String::from_utf8(message.to_vec())
@@ -200,7 +200,11 @@ impl MessagingClient {
                                                     .to_str()
                                                     .expect("error converting signature to string")
                                                     .to_string();
-                                                let data_type = "message".to_string();
+                                                let data_type = match path.as_str() {
+                                                    "/message" => "message".to_string(),
+                                                    "/data" => "data".to_string(),
+                                                    _ => "unknown".to_string(),
+                                                };
                                                 let data = message;
 
                                                 let message = ChatMessage {
@@ -213,6 +217,8 @@ impl MessagingClient {
                                                     cb.new_message(message.clone());
                                                 }
                                             }
+                                        } else {
+                                            info!("unknown path");
                                         }
                                         Ok::<Response<String>, anyhow::Error>(
                                             Response::builder()
@@ -237,7 +243,12 @@ impl MessagingClient {
         clone_onion_address
     }
 
-    pub async fn send_message_inner(&self, message: &str, recipient: &str) -> String {
+    pub async fn send_message_inner(
+        &self,
+        message: &str,
+        recipient: &str,
+        endpoint: &str,
+    ) -> String {
         let url: Uri = Uri::from_str(recipient).expect("error parsing recipient URL");
         let host = url.host().unwrap();
 
@@ -268,7 +279,7 @@ impl MessagingClient {
         let resp = request_sender
             .send_request(
                 Request::builder()
-                    .uri("/message")
+                    .uri(endpoint)
                     .header("Host", host)
                     .header(
                         "X-Signature-Ed25519",
@@ -310,7 +321,12 @@ impl MessagingClient {
 
     pub fn send_message(&self, message: &str, recipient: &str) -> String {
         let runtime = self.client.runtime().clone();
-        runtime.block_on(async { self.send_message_inner(message, recipient).await })
+        runtime.block_on(async { self.send_message_inner(message, recipient, "/message").await })
+    }
+
+    pub fn send_base64_data(&self, data: &str, recipient: &str) -> String {
+        let runtime = self.client.runtime().clone();
+        runtime.block_on(async { self.send_message_inner(&data, recipient, "/data").await })
     }
 
     pub fn subscribe(&self, cb: Box<dyn OnEvent>) {
