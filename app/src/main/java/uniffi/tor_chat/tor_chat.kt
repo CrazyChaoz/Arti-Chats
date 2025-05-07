@@ -762,6 +762,8 @@ internal open class UniffiVTableCallbackInterfaceOnEvent(
 
 
 
+
+
 // For large crates we prevent `MethodTooLargeException` (see #2340)
 // N.B. the name of the extension is very misleading, since it is
 // rather `InterfaceTooLargeException`, caused by too many methods
@@ -788,6 +790,8 @@ internal interface IntegrityCheckingUniffiLib : Library {
     fun uniffi_tor_chat_checksum_method_messagingclient_onion_service_from_esk(
     ): Short
     fun uniffi_tor_chat_checksum_method_messagingclient_onion_service_from_sk(
+    ): Short
+    fun uniffi_tor_chat_checksum_method_messagingclient_send_base64_data(
     ): Short
     fun uniffi_tor_chat_checksum_method_messagingclient_send_message(
     ): Short
@@ -859,9 +863,11 @@ internal interface UniffiLib : Library {
     ): RustBuffer.ByValue
     fun uniffi_tor_chat_fn_method_messagingclient_onion_service_from_sk(`ptr`: Pointer,`secretKey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
+    fun uniffi_tor_chat_fn_method_messagingclient_send_base64_data(`ptr`: Pointer,`data`: RustBuffer.ByValue,`recipient`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+    ): RustBuffer.ByValue
     fun uniffi_tor_chat_fn_method_messagingclient_send_message(`ptr`: Pointer,`message`: RustBuffer.ByValue,`recipient`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
-    fun uniffi_tor_chat_fn_method_messagingclient_send_message_inner(`ptr`: Pointer,`message`: RustBuffer.ByValue,`recipient`: RustBuffer.ByValue,
+    fun uniffi_tor_chat_fn_method_messagingclient_send_message_inner(`ptr`: Pointer,`message`: RustBuffer.ByValue,`recipient`: RustBuffer.ByValue,`endpoint`: RustBuffer.ByValue,
     ): Long
     fun uniffi_tor_chat_fn_method_messagingclient_subscribe(`ptr`: Pointer,`cb`: Long,uniffi_out_err: UniffiRustCallStatus,
     ): Unit
@@ -1019,10 +1025,13 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_tor_chat_checksum_method_messagingclient_onion_service_from_sk() != 11801.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_tor_chat_checksum_method_messagingclient_send_base64_data() != 22548.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_tor_chat_checksum_method_messagingclient_send_message() != 59433.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_tor_chat_checksum_method_messagingclient_send_message_inner() != 28857.toShort()) {
+    if (lib.uniffi_tor_chat_checksum_method_messagingclient_send_message_inner() != 59006.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_tor_chat_checksum_method_messagingclient_subscribe() != 58128.toShort()) {
@@ -1421,9 +1430,11 @@ public interface MessagingClientInterface {
 
     fun `onionServiceFromSk`(`secretKey`: kotlin.ByteArray): kotlin.String
 
+    fun `sendBase64Data`(`data`: kotlin.String, `recipient`: kotlin.String): kotlin.String
+
     fun `sendMessage`(`message`: kotlin.String, `recipient`: kotlin.String): kotlin.String
 
-    suspend fun `sendMessageInner`(`message`: kotlin.String, `recipient`: kotlin.String): kotlin.String
+    suspend fun `sendMessageInner`(`message`: kotlin.String, `recipient`: kotlin.String, `endpoint`: kotlin.String): kotlin.String
 
     fun `subscribe`(`cb`: OnEvent)
 
@@ -1543,6 +1554,18 @@ open class MessagingClient: Disposable, AutoCloseable, MessagingClientInterface
     }
 
 
+    override fun `sendBase64Data`(`data`: kotlin.String, `recipient`: kotlin.String): kotlin.String {
+        return FfiConverterString.lift(
+            callWithPointer {
+                uniffiRustCall() { _status ->
+                    UniffiLib.INSTANCE.uniffi_tor_chat_fn_method_messagingclient_send_base64_data(
+                        it, FfiConverterString.lower(`data`),FfiConverterString.lower(`recipient`),_status)
+                }
+            }
+        )
+    }
+
+
     override fun `sendMessage`(`message`: kotlin.String, `recipient`: kotlin.String): kotlin.String {
         return FfiConverterString.lift(
             callWithPointer {
@@ -1557,12 +1580,12 @@ open class MessagingClient: Disposable, AutoCloseable, MessagingClientInterface
 
 
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `sendMessageInner`(`message`: kotlin.String, `recipient`: kotlin.String) : kotlin.String {
+    override suspend fun `sendMessageInner`(`message`: kotlin.String, `recipient`: kotlin.String, `endpoint`: kotlin.String) : kotlin.String {
         return uniffiRustCallAsync(
             callWithPointer { thisPtr ->
                 UniffiLib.INSTANCE.uniffi_tor_chat_fn_method_messagingclient_send_message_inner(
                     thisPtr,
-                    FfiConverterString.lower(`message`),FfiConverterString.lower(`recipient`),
+                    FfiConverterString.lower(`message`),FfiConverterString.lower(`recipient`),FfiConverterString.lower(`endpoint`),
                 )
             },
             { future, callback, continuation -> UniffiLib.INSTANCE.ffi_tor_chat_rust_future_poll_rust_buffer(future, callback, continuation) },
