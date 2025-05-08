@@ -66,7 +66,7 @@
 
       craneLib = (crane.mkLib pkgs).overrideToolchain toolchain;
 
-      naerskBuildEmbedded = target: craneLib.buildPackage {
+      craneBuildEmbedded = target: craneLib.buildPackage {
         src = craneLib.cleanCargoSource ./.;
         version = "0.1.0";
         #singleStep = true; # to catch non-determinism in dependencies
@@ -91,7 +91,7 @@
           "${ndk-bundle}/libexec/android-sdk/ndk-bundle/toolchains/llvm/prebuilt/${hostArchLlvm}/bin/${ clangTarget target }${androidMinSdkApiLevel}-clang";
       };
 
-      embeddedAllAndroid = attributeUtils.mapAttrs (target_name: _: { embedded = naerskBuildEmbedded target_name; }) targetInfo;
+      embeddedAllAndroid = attributeUtils.mapAttrs (target_name: _: { embedded = craneBuildEmbedded target_name; }) targetInfo;
 
       androidAllArchs = pkgs.linkFarm "android-all-archs" (
         attributeUtils.mapAttrsToList

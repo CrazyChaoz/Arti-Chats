@@ -1,3 +1,105 @@
+//! Documentation for the Rust-based MessagingClient and related components.
+//!
+//! This module provides an implementation of a `MessagingClient` that sets up 
+//! a Tor-based communication service featuring onion routing for privacy 
+//! and secure data exchange. The client supports creating onion services, 
+//! handling requests, and notifying observers of incoming messages.
+//!
+//! **Key Components**
+//!
+//! - **OnEvent Trait**: Callback interface for observers to receive new messages.
+//! - **ChatMessage**: Data structure representing a message with signature, type, and content.
+//! - **MessagingClient**: Main struct for managing the Tor client and onion service.
+//!
+//! **Objective**
+//!
+//! The `MessagingClient` allows creating and managing an onion service using a 
+//! Tor client with secured message handling. Observers can be notified of new 
+//! messages when they arrive on predefined paths (/message, /data).
+//!
+//! **Features**
+//!
+//! - Set up a Tor client with cached configurations.
+//! - Create onion services with Ed25519 keys.
+//! - Register observers to react to incoming messages.
+//! - Route incoming requests on the onion service's port.
+//!
+//! **Code Description**:
+//!
+//! #### OnEvent Trait
+//!
+//! ```no_run
+//! /// Defines a callback interface for handling new messages.
+//! #[uniffi::export(callback_interface)]
+//! pub trait OnEvent: Send {
+//!     /// Called when a new `ChatMessage` is received.
+//!     /// - `s`: The received message.
+//!     fn new_message(&self, s: ChatMessage);
+//! }
+//! ```
+//!
+//! #### ChatMessage Structure
+//!
+//! ```no_run
+//! /// Represents a signed message containing its type and data.
+//! #[derive(uniffi::Record, Clone)]
+//! pub struct ChatMessage {
+//!     pub signature: String,  // Ed25519 Signature in base64 format.
+//!     pub data_type: String,  // Type of the data ("message", "data", etc.).
+//!     pub data: String,       // Content or payload of the message.
+//! }
+//! ```
+//!
+//! #### MessagingClient Implementation
+//!
+//! ```no_run
+//! #[derive(uniffi::Object)]
+//! pub struct MessagingClient {
+//!     client: TorClient<PreferredRuntime>,     // The Tor client instance.
+//!     key_pair: Arc<Mutex<Option<[u8; 64]>>>, // Storing Ed25519 private key.
+//!     observers: Arc<Mutex<Vec<Box<dyn OnEvent>>>>, // List of registered observers.
+//! }
+//! ```
+//!
+//! #### Key Methods
+//!
+//! - `MessagingClient::new`
+//!
+//! Initializes a new `MessagingClient` with a Tor client configured for 
+//! onion routing. This method:
+//! - Initializes logging (on Android systems).
+//! - Configures the Tor client using cached directories.
+//! - Boots up the Tor client and prepares it for communication.
+//!
+//! - `MessagingClient::onion_service_from_sk` / `onion_service_from_esk`
+//!
+//! Creates an onion service with an Ed25519 secret key or expanded secret key. 
+//! These methods handle:
+//! - Key formatting and conversion.
+//! - Launching an onion service.
+//! - Handling cases where an existing service for the key may be reused.
+//!
+//! - `MessagingClient`'s server interface
+//!
+//! The client listens for incoming connections on the onion service using:
+//! - The Tor client's stream and message handling APIs.
+//! - Routes requests to `/message` and `/data` endpoints.
+//! - Validates requests based on headers (like "X-Signature-Ed25519").
+//! - Notifies registered observers of incoming messages.
+//!
+//! **Example Usage**
+//!
+//! ```no_run
+//! let client = MessagingClient::new("/your/cache/dir");
+//! client.onion_service_from_sk(&key);
+//! ```
+//!
+//! **Platform Support**
+//!
+//! This implementation handles Android system-specific logging using 
+//! `tracing_android`. It ensures proper initialization to avoid potential 
+//! issues when managing logs on Android devices.
+
 use arti_client::config::TorClientConfigBuilder;
 use arti_client::TorClient;
 use base64::Engine;
