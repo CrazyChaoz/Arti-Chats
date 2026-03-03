@@ -1,0 +1,12 @@
+default:
+  tags:
+    - nix-container-shell
+
+stages:
+  - build
+  - verify
+
+nix-build:
+  stage: build
+  script:
+    - nix build --print-build-logs
