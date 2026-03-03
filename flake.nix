@@ -7,10 +7,7 @@
     android.url = "github:tadfisher/android-nixpkgs";
     nix-filter.url = github:numtide/nix-filter;
     gradle-dot-nix.url = "github:CrazyChaoz/gradle-dot-nix";
-    backend-rust = {
-      type = "git";
-      url = "https://git.ins.jku.at/proj/digidow/tor-chat-rust-library.git";
-    };
+    backend-rust.url = "./backend";
 
   };
 
@@ -47,7 +44,7 @@
 
       gradle-init-script = (import gradle-dot-nix {
         inherit pkgs;
-        gradle-verification-metadata-file = ./gradle/verification-metadata.xml;
+        gradle-verification-metadata-file = ./frontend/gradle/verification-metadata.xml;
       }).gradle-init;
 
 
@@ -58,7 +55,7 @@
       unsigned-apk = pkgs.stdenv.mkDerivation {
         name = "tor-chat-app";
         src = nix-filter-lib {
-          root = ./.;
+          root = ./frontend;
           exclude = [
             (nix-filter-lib.matchExt "nix")
           ];
@@ -91,7 +88,7 @@
       sign = pkgs.runCommandLocal "sign-apk" { buildInputs = [ pkgs.apksigner ]; } ''
             mkdir -p $out
             cp ${unsigned-apk}/app-release-unsigned.apk .
-            apksigner sign --ks-key-alias testkey --ks ${./testkey.keystore} --ks-pass pass:android --key-pass pass:android app-release-unsigned.apk
+            apksigner sign --ks-key-alias testkey --ks ${./frontend/testkey.keystore} --ks-pass pass:android --key-pass pass:android app-release-unsigned.apk
             cp app-release-unsigned.apk $out/app-release-signed.apk
           '';
     in
