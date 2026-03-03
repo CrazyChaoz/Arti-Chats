@@ -1,0 +1,11 @@
+default:
+  tags:
+    - nix-container-shell
+
+stages:
+  - buildandtest
+
+nixbuild:
+  stage: buildandtest
+  script:
+    - nix build --print-build-logs
