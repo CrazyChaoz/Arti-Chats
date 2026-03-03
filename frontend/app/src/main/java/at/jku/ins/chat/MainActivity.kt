@@ -85,10 +85,10 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.MutableState
 
 
-data class Message(val text: String, val isMe: Boolean, var received: Boolean = false, var error: Boolean = false)
+data class Message(val originalMessage: ChatMessage, val isMe: Boolean, var received: Boolean = false, var error: Boolean = false)
 
 object ProgramState {
-    val messages = mutableStateMapOf<String, MutableList<MutableState<Message>>>()
+    val messages = mutableStateMapOf<String, MutableSet<MutableState<Message>>>()
     var partnerAddress = mutableStateOf("")
     var chatServiceAddress by mutableStateOf("")
 }
@@ -99,7 +99,7 @@ class MainActivity() : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        ProgramState.messages[""] = mutableStateListOf()
+        ProgramState.messages[""] = mutableSetOf()
 
         startService(Intent(this, MessagingService::class.java))
 
@@ -122,11 +122,12 @@ class MainActivity() : ComponentActivity() {
                                 ProgramState.messages[address]?.add(
                                     mutableStateOf(
                                         Message(
-                                            message.data,
+                                            message,
                                             isMe = false,
                                             received = true
                                         )
                                     )
+
                                 )
                             }
                         }
@@ -146,14 +147,14 @@ class MainActivity() : ComponentActivity() {
                         onAddressChange = { newAddress ->
                             if (isValidOnionUrl(newAddress)) {
                                 if (!ProgramState.messages.containsKey(newAddress)) {
-                                    ProgramState.messages[newAddress] = mutableStateListOf()
+                                    ProgramState.messages[newAddress] = mutableSetOf()
                                 }
                                 ProgramState.partnerAddress.value = newAddress
                             }
                         },
                         onSend = { newMessage ->
                             if (isValidOnionUrl(ProgramState.partnerAddress.value)) {
-                                val message = mutableStateOf(Message(newMessage, isMe = true))
+                                val message = mutableStateOf(Message(ChatMessage("none","none",newMessage), isMe = true))
                                 ProgramState.messages[ProgramState.partnerAddress.value]?.add(
                                     message
                                 )
@@ -192,7 +193,7 @@ class MainActivity() : ComponentActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         handleQRCodeResult(requestCode, resultCode, data) { newAddress ->
             if (!ProgramState.messages.containsKey(newAddress)) {
-                ProgramState.messages[newAddress] = mutableStateListOf()
+                ProgramState.messages[newAddress] = mutableSetOf()
             }
             ProgramState.partnerAddress.value = newAddress
         }
@@ -310,7 +311,7 @@ fun ChatApp(
             onDismiss = { showAddManuallyPopup = false },
             onAddContact = { newAddress, nickname ->
                 if (!ProgramState.messages.containsKey(newAddress)) {
-                    ProgramState.messages[newAddress] = mutableStateListOf()
+                    ProgramState.messages[newAddress] = mutableSetOf()
                 }
                 // Handle nickname if needed
                 showAddManuallyPopup = false
@@ -544,7 +545,7 @@ fun handleQRCodeResult(
 
 @Composable
 fun ChatMessages(
-    messages: MutableMap<String, MutableList<MutableState<Message>>>,
+    messages: MutableMap<String, MutableSet<MutableState<Message>>>,
     address: String
 ) {
     val listState = rememberLazyListState()
@@ -557,7 +558,7 @@ fun ChatMessages(
         state = listState,
         modifier = Modifier.padding(8.dp)
     ) {
-        items(messages[address]!!) { message ->
+        items(messages[address]!!.toList()) { message ->
             ChatBubble(message)
         }
     }
@@ -585,7 +586,7 @@ fun ChatBubble(message: MutableState<Message>) {
                 )
             }
             Text(
-                text = message.value.text,
+                text = message.value.originalMessage.data,
                 modifier = Modifier
                     .background(backgroundColor)
                     .padding(8.dp),
